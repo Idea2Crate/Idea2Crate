@@ -48,6 +48,12 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def local_matches(actual, expected):
+    # Git may check UTF-8 managed text out as CRLF on Windows. Server checks
+    # continue to compare exact Git blobs; only the local working copy varies.
+    return actual.replace(b"\r\n", b"\n") == expected
+
+
 def protected(path):
     name = PurePosixPath(path).name.casefold()
     return (
@@ -232,5 +238,5 @@ def local_check(source, root):
         for length in range(1, len(PurePosixPath(path).parts) + 1):
             if root.joinpath(*PurePosixPath(path).parts[:length]).is_symlink():
                 raise PolicyError("Managed paths cannot use symlinks: " + path)
-        if file.read_bytes() != data:
+        if not local_matches(file.read_bytes(), data):
             raise PolicyError("Managed file differs from central source: " + path)
