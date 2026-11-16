@@ -70,6 +70,14 @@ class GitSourceTests(unittest.TestCase):
             )
             git(target, "add", ".")
             local_check(central, target)
+            for name, content in payload(
+                central, approved, "Idea2Crate/Snip2Pin"
+            ).items():
+                (target / name).write_bytes(content.replace(b"\n", b"\r\n"))
+            local_check(central, target)
+            self.assertEqual(
+                apply_local(central, target, "Idea2Crate/Snip2Pin", approved), []
+            )
             # This is the environment Git exports to hooks in linked worktrees.
             # Foreign source reads must not silently use the target's Git dir.
             with patch.dict(

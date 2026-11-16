@@ -3,7 +3,15 @@
 import subprocess
 from pathlib import Path, PurePosixPath
 
-from .bundle import LOCK, PolicyError, git_environment, payload, protected, read_lock
+from .bundle import (
+    LOCK,
+    PolicyError,
+    git_environment,
+    local_matches,
+    payload,
+    protected,
+    read_lock,
+)
 
 
 def apply_local(source, target, repository, revision):
@@ -26,7 +34,7 @@ def apply_local(source, target, repository, revision):
         old = read_lock((root / LOCK).read_bytes(), repository)
         previous = payload(source, old["revision"], repository)
         for name, content in previous.items():
-            if (root / name).read_bytes() != content:
+            if not local_matches((root / name).read_bytes(), content):
                 raise PolicyError("Refusing to overwrite edited managed file: " + name)
     paths = (
         subprocess.run(
@@ -63,7 +71,7 @@ def apply_local(source, target, repository, revision):
     # lockfile that blesses an incomplete update. The next run can be inspected.
     for name in sorted(set(expected) - {LOCK}) + [LOCK]:
         file = root / name
-        if not file.exists() or file.read_bytes() != expected[name]:
+        if not file.exists() or not local_matches(file.read_bytes(), expected[name]):
             file.parent.mkdir(parents=True, exist_ok=True)
             file.write_bytes(expected[name])
             changed.append(name)
