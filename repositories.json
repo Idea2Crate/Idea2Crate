@@ -2,6 +2,6 @@
   "schema": 1,
   "source": "Idea2Crate/standards",
   "repositories": {
-    "Idea2Crate/Snip2Pin": {"branch": "main", "profile": "rust-xtask", "bootstrap_head": "3c900f60f2d052f5eba315a9e650e75fbbd57938"}
+    "Idea2Crate/Snip2Pin": {"branch": "main", "profile": "rust-xtask"}
   }
 }
