@@ -1,0 +1,15 @@
+#!/usr/bin/env python3
+"""Runs from pre-commit's immutable source checkout, not target-owned code."""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from standards.bundle import GitSource, PolicyError, local_check  # noqa: E402
+
+try:
+    local_check(GitSource(Path(__file__).resolve().parents[1]), Path.cwd())
+except (PolicyError, OSError, ValueError, KeyError) as error:
+    print("Standards check failed: " + str(error), file=sys.stderr)
+    sys.exit(1)
