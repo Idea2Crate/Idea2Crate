@@ -1,0 +1,32 @@
+minimum_pre_commit_version: '4.7.0'
+default_stages: [pre-commit]
+fail_fast: true
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--enforce-all]
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 488940d9de1b658fac229e34c521d75a6ea476f2 # v0.14.5
+    hooks:
+      - id: ruff-check
+      - id: ruff-format
+  - repo: local
+    hooks:
+      - id: standards-secrets
+        name: Reject private keys and recognizable credential tokens
+        entry: hooks/check-secrets
+        language: script
+        types: [text]
+      - id: python-tests
+        name: Standards regression tests
+        entry: python3 -m unittest discover -s tests
+        language: system
+        pass_filenames: false
+        always_run: true

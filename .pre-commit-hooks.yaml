@@ -1,0 +1,11 @@
+- id: standards-integrity
+  name: Shared instructions, skills and hooks match the approved source
+  entry: hooks/check-policy
+  language: script
+  pass_filenames: false
+  always_run: true
+- id: standards-secrets
+  name: Reject private keys and recognizable credential tokens
+  entry: hooks/check-secrets
+  language: script
+  types: [text]

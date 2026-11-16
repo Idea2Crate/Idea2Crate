@@ -1,0 +1,48 @@
+name: Synchronize and verify shared standards
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '7,17,27,37,47,57 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: standards-reconcile
+  cancel-in-progress: false
+jobs:
+  reconcile:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Check installation configuration
+        env:
+          APP_ID: ${{ vars.STANDARDS_APP_ID }}
+          BOT_ID: ${{ vars.STANDARDS_BOT_ID }}
+          APP_KEY: ${{ secrets.STANDARDS_APP_PRIVATE_KEY }}
+        run: python3 -c 'import os; assert all(os.environ.get(k) for k in ("APP_ID", "BOT_ID", "APP_KEY")), "Install the Standards App and configure central variables/secrets; see docs/automation.md"'
+      - name: Select enrolled repositories
+        id: enrollment
+        run: |
+          python3 -c 'import json, os; r=json.load(open("repositories.json")); names=["standards"]+[x.split("/", 1)[1] for x in r["repositories"]]; print("repositories="+",".join(names))' >> "$GITHUB_OUTPUT"
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
+        id: app
+        with:
+          app-id: ${{ vars.STANDARDS_APP_ID }}
+          private-key: ${{ secrets.STANDARDS_APP_PRIVATE_KEY }}
+          owner: Idea2Crate
+          repositories: ${{ steps.enrollment.outputs.repositories }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-checks: write
+      - name: Sync approved policy and check open PRs
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          STANDARDS_APP_ID: ${{ vars.STANDARDS_APP_ID }}
+          STANDARDS_BOT_ID: ${{ vars.STANDARDS_BOT_ID }}
+        run: python3 -m standards reconcile --sync
