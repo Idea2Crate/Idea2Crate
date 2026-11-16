@@ -1,9 +1,17 @@
+import os
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from standards.bundle import GitSource, PolicyError, local_check, payload
+from standards.bundle import (
+    GitSource,
+    PolicyError,
+    git_environment,
+    local_check,
+    payload,
+)
 from standards.install import apply_local
 
 
@@ -19,7 +27,10 @@ class GitSourceTests(unittest.TestCase):
             def git(path, *args):
                 return (
                     subprocess.run(
-                        ["git", "-C", str(path), *args], check=True, capture_output=True
+                        ["git", "-C", str(path), *args],
+                        check=True,
+                        capture_output=True,
+                        env=git_environment(),
                     )
                     .stdout.decode()
                     .strip()
@@ -59,6 +70,18 @@ class GitSourceTests(unittest.TestCase):
             )
             git(target, "add", ".")
             local_check(central, target)
+            # This is the environment Git exports to hooks in linked worktrees.
+            # Foreign source reads must not silently use the target's Git dir.
+            with patch.dict(
+                os.environ,
+                {
+                    "GIT_DIR": str(target / ".git"),
+                    "GIT_WORK_TREE": str(target),
+                    "GIT_INDEX_FILE": str(target / ".git/index"),
+                },
+            ):
+                self.assertEqual(central.head, approved)
+                local_check(central, target)
             (target / "AGENTS.md").write_text("edited")
             with self.assertRaises(PolicyError):
                 local_check(central, target)

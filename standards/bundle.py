@@ -3,8 +3,10 @@
 import copy
 import hashlib
 import json
+import os
 import re
 import subprocess
+from functools import lru_cache
 from pathlib import Path, PurePosixPath
 
 SOURCE = "Idea2Crate/standards"
@@ -16,6 +18,24 @@ SHA = re.compile(r"[0-9a-f]{40}\Z")
 
 class PolicyError(Exception):
     """A policy violation or an unverifiable input."""
+
+
+@lru_cache(maxsize=1)
+def git_local_variables():
+    # Git documents this list as the supported way for a hook to access a
+    # foreign repository. In a worktree, GIT_DIR is an absolute path.
+    result = subprocess.run(
+        ["git", "rev-parse", "--local-env-vars"], capture_output=True, check=True
+    )
+    return frozenset(result.stdout.decode().splitlines())
+
+
+def git_environment():
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key not in git_local_variables()
+    }
 
 
 def encode(value):
@@ -63,7 +83,10 @@ class GitSource:
 
     def git(self, *args):
         result = subprocess.run(
-            ["git", "-C", str(self.root), *args], capture_output=True, check=False
+            ["git", "-C", str(self.root), *args],
+            capture_output=True,
+            check=False,
+            env=git_environment(),
         )
         if result.returncode:
             raise PolicyError("Cannot read the immutable central Git source")
@@ -196,6 +219,7 @@ def local_check(source, root):
             ],
             capture_output=True,
             check=True,
+            env=git_environment(),
         )
         .stdout.decode()
         .split("\0")

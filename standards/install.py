@@ -3,7 +3,7 @@
 import subprocess
 from pathlib import Path, PurePosixPath
 
-from .bundle import LOCK, PolicyError, payload, protected, read_lock
+from .bundle import LOCK, PolicyError, git_environment, payload, protected, read_lock
 
 
 def apply_local(source, target, repository, revision):
@@ -12,6 +12,7 @@ def apply_local(source, target, repository, revision):
         ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
         capture_output=True,
         check=True,
+        env=git_environment(),
     )
     if Path(git.stdout.decode().strip()).resolve() != root:
         raise PolicyError("Target must be the repository root")
@@ -41,6 +42,7 @@ def apply_local(source, target, repository, revision):
             ],
             capture_output=True,
             check=True,
+            env=git_environment(),
         )
         .stdout.decode()
         .split("\0")
