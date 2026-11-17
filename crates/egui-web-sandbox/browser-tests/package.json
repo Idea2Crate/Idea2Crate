@@ -1,0 +1,11 @@
+{
+  "name": "egui-web-sandbox-browser-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node parallel.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

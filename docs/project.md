@@ -6,6 +6,10 @@ central policy service. Repository setup skills are explicitly invoked.
 
 - `skills/idea2crate-repo-setup/`: the entry point, invocation metadata, baseline
   asset and license needed to create or update a project's development setup.
+- `crates/egui-web-sandbox/`: reusable egui observations, browser clipboard/reset
+  environment, browser client, independent demo and browser regression tests.
+- `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`: the Rust workspace and its
+  reproducible development toolchain; this workspace has no application dependency.
 - `AGENTS.md`: this repository's own instructions, independently maintained.
 - `.pre-commit-config.yaml`: this repository's checks, not an exported profile.
 - `hooks/check_secrets.py`: a local credential-pattern guard. It complements
@@ -18,11 +22,19 @@ consumer list or privileged service. The setup skill uses a template as advice,
 then adapts the result to the target repository. It must not silently reconfigure
 branch protections or change the user's existing hooks.
 
-Use Python 3.11+ and pre-commit 4.7.0 for development. Install the local hooks with
+Use the pinned Rust toolchain, Node.js 24, Python 3.11+ and pre-commit 4.7.0 for
+development. Install the local hooks with
 `pre-commit install`, then run `pre-commit run --all-files`. If another tool owns
 `core.hooksPath`, use its supported integration; preserve security and LFS hooks.
 CI runs these checks in one Ubuntu `verify` job, which is required for merging.
 The credential guard itself uses Python 3.9+ and the standard library.
+
+Rust hooks run formatting and WASM Clippy. CI also checks the native library,
+builds the independent WASM demo and runs its existing parallel browser tests.
+Build and run commands live in the crate's [quick start](../crates/egui-web-sandbox/docs/quick-start.md).
+Keep the browser library independent of consumers, including their manifests,
+native services and build commands. Dependents select their own compatible egui
+source. Do not rely on a consuming workspace to enable required Cargo features.
 
 For a new or changed skill, also run your agent's bundled skill validator and
 check its behavior against realistic requests: creating a new project, updating

@@ -30,3 +30,15 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: rust-format
+        name: Rust formatting
+        entry: cargo fmt --all --check
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: rust-lint
+        name: WASM library and examples Clippy
+        entry: cargo clippy --locked --workspace --all-targets --all-features --target wasm32-unknown-unknown -- -D warnings
+        language: system
+        pass_filenames: false
+        always_run: true

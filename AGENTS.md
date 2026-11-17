@@ -33,7 +33,7 @@ outside our scope. Reuse compatible open-source components with attribution.
 - Report the checks actually run, failures and material gaps; never claim an
   unperformed acceptance check.
 - Use the project's pinned tools and documented checks. This repository's
-  Python and text checks run through `pre-commit run --all-files`.
+  Python, text and Rust checks run through `pre-commit run --all-files`.
 - Review the final diff for correctness, scope, stale code and documentation.
 - Keep PR titles short. PR bodies and PR progress comments contain only
   problem and fix lists for contributors without internal context. Omit

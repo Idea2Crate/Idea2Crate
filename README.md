@@ -8,7 +8,17 @@ outside our scope. Reuse compatible open-source components with attribution.
 Each repository maintains its own `AGENTS.md`, hooks and CI. Use these resources
 when needed; this repository does not synchronize or enforce project rules.
 
-## Available skill
+## Available resources
+
+| Resource | Purpose |
+| --- | --- |
+| [egui-web-sandbox](crates/egui-web-sandbox/) | Observe and test egui interfaces in isolated browsers; includes a standalone demo and browser client |
+| [idea2crate-repo-setup](skills/idea2crate-repo-setup/SKILL.md) | Create a project or update its development rules when explicitly invoked |
+
+The Rust crate is available as a Git dependency pinned to a reviewed commit;
+it is not published to crates.io. Start with its [quick start](crates/egui-web-sandbox/docs/quick-start.md).
+
+## Repository setup skill
 
 [`idea2crate-repo-setup`](skills/idea2crate-repo-setup/SKILL.md) creates a new
 project's development setup or updates an existing project's instructions and
