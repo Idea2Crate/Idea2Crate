@@ -39,8 +39,12 @@ outside our scope. Reuse compatible open-source components with attribution.
   rustfmt, Clippy and the documented Cargo checks. Other languages use their
   documented equivalents; shared rules do not mandate Rust for infrastructure.
 - Review the final diff for correctness, scope, stale code and documentation.
-  Public descriptions explain the problem, behavior and validation, without
-  private conversation, personal paths or internal coordination details.
+- Keep PR titles short. PR bodies and PR progress comments contain only
+  problem and fix lists for contributors without internal context. Omit
+  conversations, debugging history and piles of implementation details. Put
+  technical review findings in comments on the corresponding PR. Repository
+  docs retain current usage, development commands, architecture and long-term
+  maintenance rules; keep personal paths and internal coordination out.
 
 ## Testing
 

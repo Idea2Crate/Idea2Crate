@@ -278,7 +278,7 @@ def sync_repository(api, source, repository, bot_id):
                 "title": "chore(standards): sync approved development rules",
                 "head": SYNC_BRANCH,
                 "base": config["branch"],
-                "body": "Updates shared instructions, skills and pre-commit checks from [the approved source](https://github.com/%s/commit/%s).\n\nOnly centrally managed files change. Required checks must pass before auto-merge.\n"
+                "body": "Problem:\n- Shared rules are behind the approved central revision.\n\nFix:\n- Synchronize instructions, skills and checks from [the approved source](https://github.com/%s/commit/%s).\n"
                 % (SOURCE, source.head),
             },
         )
