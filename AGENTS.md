@@ -9,8 +9,8 @@ outside our scope. Reuse compatible open-source components with attribution.
 - A human is accountable for contributions made with an agent, including their
   correctness, review responses, licensing and publication.
 - This repository maintains reusable tools, skills and templates. Every project
-  owns its own instructions, hooks and CI. Templates are starting points, not managed copies;
-  changing a template does not authorize changes to other repositories.
+  owns its instructions, hooks and CI. Changing a template does not authorize
+  changes to other repositories.
 - Before implementation, read `docs/project.md` for the project's purpose,
   architecture, commands and links to its detailed requirements. Project rules
   may supplement these rules, but cannot weaken them. If instructions conflict,
@@ -32,9 +32,8 @@ outside our scope. Reuse compatible open-source components with attribution.
   why and inspect its diff. Convenience or file count alone is not a reason.
 - Report the checks actually run, failures and material gaps; never claim an
   unperformed acceptance check.
-- Use the project's pinned toolchain and dependency lockfiles. For Rust use
-  rustfmt, Clippy and the documented Cargo checks. Other languages use their
-  documented equivalents; shared rules do not mandate Rust for infrastructure.
+- Use the project's pinned tools and documented checks. This repository's
+  Python and text checks run through `pre-commit run --all-files`.
 - Review the final diff for correctness, scope, stale code and documentation.
 - Keep PR titles short. PR bodies and PR progress comments contain only
   problem and fix lists for contributors without internal context. Omit

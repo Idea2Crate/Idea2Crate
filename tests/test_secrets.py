@@ -1,15 +1,12 @@
 """Preserve the credential guard's observable rejection and redaction check."""
 
 import io
-import runpy
 import tempfile
 import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
 
-scan = runpy.run_path(str(Path(__file__).resolve().parents[1] / "hooks/check-secrets"))[
-    "scan"
-]
+from hooks.check_secrets import scan
 
 
 class CredentialGuardTests(unittest.TestCase):
