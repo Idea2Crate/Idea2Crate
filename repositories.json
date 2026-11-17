@@ -3,6 +3,11 @@
   "source": "Idea2Crate/standards",
   "revoked_revisions": {},
   "repositories": {
-    "Idea2Crate/Snip2Pin": {"branch": "main", "profile": "rust-xtask"}
+    "Idea2Crate/Snip2Pin": {
+      "branch": "main",
+      "profile": "rust-xtask",
+      "bootstrap_head": "2f467175018ac4e9dee7d65d8064a50db1416416",
+      "bootstrap_base": "67001d54fc34c4e6108ba4ec1f79e809388a6f04"
+    }
   }
 }
