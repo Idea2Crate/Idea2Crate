@@ -40,7 +40,7 @@ sandbox 不会自动把文件系统、网络任务或原生句柄替换成模拟
 
 ```toml
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-egui-web-sandbox = { git = "https://github.com/Idea2Crate/Idea2Crate", rev = "REVIEWED_COMMIT_SHA", features = ["web"] }
+egui-web-sandbox = { version = "0.1.0", git = "https://github.com/Idea2Crate/Idea2Crate", rev = "REVIEWED_COMMIT_SHA", features = ["web"] }
 ```
 
 与应用统一 egui 的版本和来源；两个不同版本的 `egui::Context` 不能互传。
