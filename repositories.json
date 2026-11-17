@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "source": "Idea2Crate/standards",
+  "revoked_revisions": {},
   "repositories": {
     "Idea2Crate/Snip2Pin": {"branch": "main", "profile": "rust-xtask"}
   }

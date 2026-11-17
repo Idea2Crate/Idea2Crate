@@ -13,6 +13,20 @@ from standards.bundle import (
     payload,
 )
 from standards.install import apply_local
+from test_policy import NEW, REPO, Source
+
+
+def git(path, *args):
+    return (
+        subprocess.run(
+            ["git", "-C", str(path), *args],
+            check=True,
+            capture_output=True,
+            env=git_environment(),
+        )
+        .stdout.decode()
+        .strip()
+    )
 
 
 class GitSourceTests(unittest.TestCase):
@@ -24,22 +38,10 @@ class GitSourceTests(unittest.TestCase):
             source.mkdir()
             target.mkdir()
 
-            def git(path, *args):
-                return (
-                    subprocess.run(
-                        ["git", "-C", str(path), *args],
-                        check=True,
-                        capture_output=True,
-                        env=git_environment(),
-                    )
-                    .stdout.decode()
-                    .strip()
-                )
-
             git(source, "init", "-b", "main")
             git(source, "config", "user.name", "Test")
             git(source, "config", "user.email", "test@example.invalid")
-            for path in ("AGENTS.md", "profiles.json", "repositories.json"):
+            for path in ("AGENTS.md", "LICENSE", "profiles.json", "repositories.json"):
                 (source / path).write_bytes((root / path).read_bytes())
             git(source, "add", ".")
             git(source, "commit", "-m", "test: source")
@@ -57,6 +59,7 @@ class GitSourceTests(unittest.TestCase):
             git(target, "init", "-b", "main")
             with self.assertRaises(PolicyError):
                 apply_local(central, target, "Idea2Crate/Snip2Pin", approved)
+
             (target / "docs").mkdir()
             (target / "docs/project.md").write_text("Preserved project rules")
             (target / "app.rs").write_text("unrelated work")
@@ -95,6 +98,58 @@ class GitSourceTests(unittest.TestCase):
                 local_check(central, target)
             with self.assertRaises(PolicyError):
                 apply_local(central, target, "Idea2Crate/Snip2Pin", approved)
+
+    def test_enrollment_preserves_local_edits_and_migrates_only_clean_files(self):
+        source = Source()
+        for state in (
+            "untracked",
+            "unstaged",
+            "staged",
+            "assume-unchanged",
+            "skip-worktree",
+            "deleted",
+            "clean",
+        ):
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as directory:
+                target = Path(directory)
+                git(target, "init", "-b", "main")
+                git(target, "config", "user.name", "Test")
+                git(target, "config", "user.email", "test@example.invalid")
+                (target / "docs").mkdir()
+                (target / "docs/project.md").write_text("Preserved project rules")
+                instructions = target / "AGENTS.md"
+                instructions.write_text("Original project rules")
+                if state != "untracked":
+                    git(target, "add", ".")
+                    git(target, "commit", "-m", "test: original rules")
+                if state in {"assume-unchanged", "skip-worktree"}:
+                    git(target, "update-index", "--" + state, "AGENTS.md")
+                if state in {"unstaged", "staged", "assume-unchanged", "skip-worktree"}:
+                    instructions.write_text("Uncommitted project rules")
+                if state == "staged":
+                    git(target, "add", "AGENTS.md")
+                if state == "deleted":
+                    git(target, "rm", "AGENTS.md")
+                before = instructions.read_bytes() if instructions.exists() else None
+                if state == "clean":
+                    apply_local(source, target, REPO, NEW)
+                    self.assertEqual(
+                        instructions.read_bytes(), source.files(NEW)["AGENTS.md"]
+                    )
+                    self.assertEqual(
+                        (target / "docs/project.md").read_text(),
+                        "Preserved project rules",
+                    )
+                else:
+                    with self.assertRaises(PolicyError):
+                        apply_local(source, target, REPO, NEW)
+                    self.assertEqual(
+                        instructions.read_bytes() if instructions.exists() else None,
+                        before,
+                    )
+                    self.assertFalse(
+                        (target / ".idea2crate/standards.lock.json").exists()
+                    )
 
 
 if __name__ == "__main__":

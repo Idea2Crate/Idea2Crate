@@ -13,11 +13,16 @@ SOURCE = "Idea2Crate/standards"
 LOCK = ".idea2crate/standards.lock.json"
 CHECK = "Idea2Crate / standards"
 SYNC_BRANCH = "codex/sync-standards"
+VERSION = 2
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 
 
 class PolicyError(Exception):
-    """A policy violation or an unverifiable input."""
+    """A contribution does not meet the policy."""
+
+
+class OperationError(PolicyError):
+    """Verification or synchronization could not finish safely."""
 
 
 @lru_cache(maxsize=1)
@@ -55,12 +60,16 @@ def local_matches(actual, expected):
 
 
 def protected(path):
+    """Reserve central paths while leaving project skills project-owned."""
+    folded = path.casefold()
     name = PurePosixPath(path).name.casefold()
+    skill = folded.removeprefix(".agents/skills/").split("/", 1)[0]
     return (
         name in {"agents.md", "agents.override.md"}
-        or path.casefold() == ".pre-commit-config.yaml"
-        or path.casefold().startswith((".agents/skills/", ".idea2crate/"))
-        or path.casefold() in {".agents/skills", ".idea2crate"}
+        or folded == ".pre-commit-config.yaml"
+        or folded.startswith(".idea2crate/")
+        or folded in {".agents/skills", ".idea2crate"}
+        or (folded.startswith(".agents/skills/") and skill.startswith("idea2crate-"))
     )
 
 
@@ -69,9 +78,12 @@ def read_lock(data, repository):
         value = json.loads(data)
     except (ValueError, UnicodeError) as exc:
         raise PolicyError("Missing or invalid standards lockfile") from exc
+    if isinstance(value, dict) and value.get("schema") != VERSION:
+        raise PolicyError(
+            "Unsupported bundle format version; reviewed enrollment required"
+        )
     if (
         not isinstance(value, dict)
-        or value.get("schema") != 1
         or value.get("source") != SOURCE
         or value.get("repository") != repository
         or not isinstance(value.get("revision"), str)
@@ -95,7 +107,7 @@ class GitSource:
             env=git_environment(),
         )
         if result.returncode:
-            raise PolicyError("Cannot read the immutable central Git source")
+            raise OperationError("Cannot read the immutable central Git source")
         return result.stdout
 
     @property
@@ -105,7 +117,23 @@ class GitSource:
     def approved(self, revision):
         if not isinstance(revision, str) or not SHA.fullmatch(revision):
             raise PolicyError("Expected a full central commit SHA")
-        self.git("merge-base", "--is-ancestor", revision, self.head)
+        head = self.head
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(self.root),
+                "merge-base",
+                "--is-ancestor",
+                revision,
+                head,
+            ],
+            capture_output=True,
+            check=False,
+            env=git_environment(),
+        )
+        if result.returncode:
+            raise PolicyError("Source revision is not an approved ancestor")
 
     def files(self, revision):
         self.approved(revision)
@@ -116,8 +144,8 @@ class GitSource:
             selected = [
                 p
                 for p in paths
-                if p in {"AGENTS.md", "profiles.json", "repositories.json"}
-                or p.startswith(".agents/skills/")
+                if p in {"AGENTS.md", "LICENSE", "profiles.json", "repositories.json"}
+                or p.startswith(".agents/skills/idea2crate-")
             ]
             self._files[revision] = {
                 p: self.git("show", revision + ":" + p) for p in selected
@@ -125,13 +153,19 @@ class GitSource:
         return self._files[revision]
 
 
-def registry(source, revision):
+def configuration(source, revision):
     value = json.loads(source.files(revision)["repositories.json"])
     if value.get("schema") != 1 or value.get("source") != SOURCE:
         raise PolicyError("Invalid central registry")
     repositories = value.get("repositories")
     if not isinstance(repositories, dict):
         raise PolicyError("Invalid repository enrollment list")
+    revoked = value.get("revoked_revisions", {})
+    if not isinstance(revoked, dict) or any(
+        not SHA.fullmatch(sha) or not isinstance(reason, str) or not reason.strip()
+        for sha, reason in revoked.items()
+    ):
+        raise PolicyError("Revocations require full source SHAs and nonempty reasons")
     for name, config in repositories.items():
         if (
             not re.fullmatch(r"Idea2Crate/[A-Za-z0-9_.-]+", name)
@@ -139,9 +173,29 @@ def registry(source, revision):
             or not isinstance(config, dict)
             or not re.fullmatch(r"[A-Za-z0-9_./-]+", config.get("branch", ""))
             or not config.get("profile")
+            or (
+                any(key in config for key in ("bootstrap_head", "bootstrap_base"))
+                and not all(
+                    isinstance(config.get(key), str) and SHA.fullmatch(config[key])
+                    for key in ("bootstrap_head", "bootstrap_base")
+                )
+            )
         ):
             raise PolicyError("Invalid enrolled repository: " + name)
-    return repositories
+    return value
+
+
+def registry(source, revision):
+    return configuration(source, revision)["repositories"]
+
+
+def require_active(source, revision):
+    source.approved(revision)
+    reason = (
+        configuration(source, source.head).get("revoked_revisions", {}).get(revision)
+    )
+    if reason:
+        raise PolicyError("Installed policy revision was revoked: " + reason)
 
 
 def payload(source, revision, repository):
@@ -151,6 +205,10 @@ def payload(source, revision, repository):
     if config is None:
         raise PolicyError("Repository is not enrolled at this revision")
     profiles = json.loads(files["profiles.json"])
+    if profiles.get("bundle_version") != VERSION:
+        raise PolicyError(
+            "Unsupported bundle format version; reviewed enrollment required"
+        )
     profile = profiles["profiles"].get(config["profile"])
     if not isinstance(profile, list):
         raise PolicyError("Unknown pre-commit profile")
@@ -167,15 +225,16 @@ def payload(source, revision, repository):
     result = {
         p: data
         for p, data in files.items()
-        if p == "AGENTS.md" or p.startswith(".agents/skills/")
+        if p == "AGENTS.md" or p.startswith(".agents/skills/idea2crate-")
     }
+    result[".idea2crate/LICENSE"] = files["LICENSE"]
     result[".pre-commit-config.yaml"] = (
         b"# Generated by Idea2Crate/standards; edit the central source.\n"
         + encode(precommit)
     )
     result[LOCK] = encode(
         {
-            "schema": 1,
+            "schema": VERSION,
             "source": SOURCE,
             "revision": revision,
             "repository": repository,

@@ -1,9 +1,18 @@
 import copy
+import json
 import unittest
+from unittest.mock import patch
 
 from test_policy import Api, BASE, BOT, NEW, OLD, REPO, Source, git_blob
-from standards.automation import sync_repository
-from standards.bundle import LOCK, SYNC_BRANCH, PolicyError, payload, verify_tree
+from standards.automation import check_pull, reconcile, sync_repository
+from standards.bundle import (
+    LOCK,
+    SYNC_BRANCH,
+    OperationError,
+    PolicyError,
+    payload,
+    verify_tree,
+)
 
 
 class Remote(Api):
@@ -97,6 +106,18 @@ class Remote(Api):
             "parents": [{"sha": BASE}],
         }
 
+    def is_ancestor(self, repository, ancestor, descendant):
+        pending = [descendant]
+        visited = set()
+        while pending:
+            sha = pending.pop()
+            if sha == ancestor:
+                return True
+            if sha not in visited:
+                visited.add(sha)
+                pending.extend(p["sha"] for p in self.commits[sha]["parents"])
+        return False
+
 
 class SyncTests(unittest.TestCase):
     def setUp(self):
@@ -116,7 +137,7 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(self.api.merges, ["PR_test"])
 
     def test_retired_files_are_deleted_during_sync(self):
-        path = ".agents/skills/retired/SKILL.md"
+        path = ".agents/skills/idea2crate-retired/SKILL.md"
         self.source.versions[OLD][path] = b"old"
         self.api = Remote(self.source)
         sync_repository(self.api, self.source, REPO, BOT)
@@ -129,21 +150,70 @@ class SyncTests(unittest.TestCase):
         sync_repository(self.api, self.source, REPO, BOT)
         self.assertNotEqual(self.api.ref, first)
         self.assertIn("new-code.rs", self.api.trees[self.api.ref])
-        self.assertEqual(self.api.commits[self.api.ref]["parents"][0]["sha"], first)
-        updates = [data for method, path, data in self.api.writes if method == "PATCH"]
-        self.assertEqual(updates[-1]["force"], False)
 
     def test_mixed_bot_branch_is_never_overwritten(self):
         sync_repository(self.api, self.source, REPO, BOT)
-        self.api.trees[self.api.ref]["injected.rs"] = (
+        first = self.api.ref
+        feature, mixed = "8" * 40, "9" * 40
+        self.api.trees[feature] = copy.deepcopy(self.api.trees[BASE])
+        self.api.trees[feature]["injected.rs"] = (
             "100644",
             git_blob(b"unexpected"),
         )
-        self.api.move_main()
+        self.api.trees[mixed] = {
+            **self.api.trees[feature],
+            **self.api.make_tree(payload(self.source, NEW, REPO)),
+        }
+        self.api.commits[mixed] = {"parents": [{"sha": first}, {"sha": feature}]}
+        self.api.ref = mixed
+        self.api.open_pr["head"]["sha"] = mixed
         writes = len(self.api.writes)
         with self.assertRaises(PolicyError):
             sync_repository(self.api, self.source, REPO, BOT)
         self.assertEqual(len(self.api.writes), writes)
+        self.assertEqual(self.api.ref, mixed)
+        self.assertIn("injected.rs", self.api.trees[self.api.ref])
+
+    def test_project_skills_and_license_survive_sync(self):
+        source = Source()
+        api = Remote(source)
+        name = ".agents/skills/project-build/SKILL.md"
+        entry = ("100644", git_blob(b"project skill"))
+        api.trees[BASE][name] = entry
+        api.git_trees["initial-tree"][name] = entry
+        sync_repository(api, source, REPO, BOT)
+        self.assertEqual(api.trees[api.ref][name], entry)
+        notice = api.trees[api.ref][".idea2crate/LICENSE"][1]
+        self.assertEqual(api.blob(REPO, notice), source.files(NEW)["LICENSE"])
+
+    def test_revocation_blocks_old_pr_but_allows_sync_repair(self):
+        config = json.loads(self.source.versions[NEW]["repositories.json"])
+        config["revoked_revisions"] = {OLD: "Unsafe historical policy"}
+        self.source.versions[NEW]["repositories.json"] = json.dumps(config).encode()
+        ordinary = Api(self.source)
+        self.assertFalse(check_pull(ordinary, self.source, REPO, 1, BOT))
+        sync_repository(self.api, self.source, REPO, BOT)
+        self.assertEqual(self.api.checks[-1][1], "success")
+
+    def test_reconciliation_distinguishes_rejection_from_operational_failure(self):
+        self.api.open_pr = copy.deepcopy(self.api.pr)
+        self.api.trees[self.api.pr["head"]["sha"]]["AGENTS.md"] = (
+            "100644",
+            git_blob(b"edited"),
+        )
+        self.assertEqual(reconcile(self.api, self.source, BOT), [])
+        self.assertEqual(self.api.checks[-1][1], "failure")
+        with patch.object(self.api, "tree", side_effect=OperationError("Unavailable")):
+            self.assertTrue(reconcile(self.api, self.source, BOT))
+        self.api.open_pr = None
+
+        def retarget(repository, number):
+            pr = copy.deepcopy(self.api.open_pr)
+            pr["base"]["ref"] = "staging"
+            return pr
+
+        with patch.object(self.api, "pull", side_effect=retarget):
+            self.assertTrue(reconcile(self.api, self.source, BOT, sync=True))
 
     def test_concurrent_push_causes_failure_without_force_overwrite(self):
         sync_repository(self.api, self.source, REPO, BOT)

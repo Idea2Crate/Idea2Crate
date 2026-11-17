@@ -7,28 +7,30 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
-from .bundle import CHECK, PolicyError
+from .bundle import CHECK, OperationError
 
 
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        raise PolicyError("Refusing to forward App credentials through an API redirect")
+        raise OperationError(
+            "Refusing to forward App credentials through an API redirect"
+        )
 
 
 class GitHub:
     def __init__(self, token=None, api="https://api.github.com"):
         self.token = token or os.environ.get("GH_TOKEN")
         if not self.token:
-            raise PolicyError(
+            raise OperationError(
                 "GH_TOKEN must contain a scoped GitHub App installation token"
             )
         if api != "https://api.github.com":
-            raise PolicyError("Only the GitHub.com API is supported")
+            raise OperationError("Only the GitHub.com API is supported")
         self.api = api
 
     def request(self, method, path, data=None, allow_missing=False):
         if not path.startswith("/") or path.startswith("//"):
-            raise PolicyError("Invalid API path")
+            raise OperationError("Invalid API path")
         request = Request(
             self.api + path,
             data=None if data is None else json.dumps(data).encode(),
@@ -46,27 +48,27 @@ class GitHub:
                 # Bound responses before parsing; never print bodies on failure.
                 raw = response.read(16 * 1024 * 1024 + 1)
                 if len(raw) > 16 * 1024 * 1024:
-                    raise PolicyError("GitHub response exceeds the supported limit")
+                    raise OperationError("GitHub response exceeds the supported limit")
                 return json.loads(raw) if raw else None
         except HTTPError as exc:
             if allow_missing and exc.code == 404:
                 return None
-            raise PolicyError(
+            raise OperationError(
                 "GitHub %s %s failed (HTTP %s)" % (method, path, exc.code)
             ) from None
         except (URLError, TimeoutError, ValueError) as exc:
-            raise PolicyError("GitHub request could not be verified") from exc
+            raise OperationError("GitHub request could not be verified") from exc
 
     def pages(self, path):
         separator = "&" if "?" in path else "?"
         for page in range(1, 102):
             if page > 100:
-                raise PolicyError("Pagination exceeded the supported limit")
+                raise OperationError("Pagination exceeded the supported limit")
             values = self.request(
                 "GET", path + separator + "per_page=100&page=" + str(page)
             )
             if not isinstance(values, list):
-                raise PolicyError("Invalid paginated GitHub response")
+                raise OperationError("Invalid paginated GitHub response")
             yield from values
             if len(values) < 100:
                 return
@@ -76,7 +78,7 @@ class GitHub:
             "GET", "/repos/%s/git/trees/%s?recursive=1" % (repository, revision)
         )
         if value.get("truncated") or not isinstance(value.get("tree"), list):
-            raise PolicyError("Cannot validate a truncated Git tree")
+            raise OperationError("Cannot validate a truncated Git tree")
         return {
             item["path"]: (item["mode"], item["sha"])
             for item in value["tree"]
@@ -86,11 +88,11 @@ class GitHub:
     def blob(self, repository, sha):
         value = self.request("GET", "/repos/%s/git/blobs/%s" % (repository, sha))
         if value.get("encoding") != "base64":
-            raise PolicyError("Unsupported GitHub blob encoding")
+            raise OperationError("Unsupported GitHub blob encoding")
         try:
             return base64.b64decode(value["content"].replace("\n", ""), validate=True)
         except (ValueError, KeyError) as exc:
-            raise PolicyError("Invalid GitHub blob") from exc
+            raise OperationError("Invalid GitHub blob") from exc
 
     def pull(self, repository, number):
         return self.request("GET", "/repos/%s/pulls/%s" % (repository, number))
@@ -99,6 +101,15 @@ class GitHub:
         return self.request(
             "GET", "/repos/%s/git/ref/heads/%s" % (repository, quote(name, safe=""))
         )
+
+    def is_ancestor(self, repository, ancestor, descendant):
+        value = self.request(
+            "GET", "/repos/%s/compare/%s...%s" % (repository, ancestor, descendant)
+        )
+        status = value.get("status")
+        if status not in {"identical", "ahead", "behind", "diverged"}:
+            raise OperationError("Cannot verify sync branch ancestry")
+        return status in {"identical", "ahead"}
 
     def check(self, repository, sha, conclusion, summary):
         existing = self.request(
@@ -138,6 +149,6 @@ class GitHub:
             },
         )
         if value.get("errors"):
-            raise PolicyError(
+            raise OperationError(
                 "GitHub could not enable auto-merge; check repository settings"
             )
