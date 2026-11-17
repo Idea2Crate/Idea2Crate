@@ -1,29 +1,35 @@
-# Standards development
+# Shared tools and skills development
 
-This repository is the canonical source of Idea2Crate's shared `AGENTS.md`,
-skills and pre-commit profiles. It contains infrastructure, not application code.
-Python 3.9+ and Git are required; runtime code has no third-party dependencies.
+Canonical repository: <https://github.com/Idea2Crate/Idea2Crate>.
+This repository contains reusable tools, skills and templates. It is not a
+central policy service. Repository setup skills are explicitly invoked.
 
-- `AGENTS.md`: the complete common instructions, identical across projects.
-- `.agents/skills/idea2crate-*`: shared skills, copied into the same discoverable
-  location. Other skill names are project-owned.
-- `profiles.json`: common pre-commit checks and explicit project profiles.
-- `repositories.json`: reviewed enrollment, target branches and source revocations.
-- `standards/`: deterministic bundle generation, GitHub API client and automation.
-- `hooks/`: local pre-commit entry points.
-- `tests/`: isolated regression tests; no real credentials or GitHub writes.
+- `skills/idea2crate-repo-setup/`: the entry point, invocation metadata, baseline
+  asset and license needed to create or update a project's development setup.
+- `AGENTS.md`: this repository's own instructions, independently maintained.
+- `.pre-commit-config.yaml`: this repository's checks, not an exported profile.
+- `hooks/check-secrets`: a local credential-pattern guard. It complements
+  GitHub secret scanning and push protection, not a complete secret scanner.
+- `tests/test_secrets.py`: the existing observable credential rejection check.
 
-Run `python3 -m unittest discover -s tests -v`. Runtime code supports Python 3.9+;
-development tooling needs Python 3.11+ for pre-commit 4.7.0. Install that pinned tool and run
-`pre-commit install`, then `pre-commit run --all-files` before contributing.
-The secret hook detects recognizable token and private-key patterns; it is not
-a complete secret scanner. GitHub secret scanning/push protection adds coverage.
-Python lint and formatting use the pinned Ruff pre-commit hooks. If another tool
-owns `core.hooksPath`, use its supported pre-commit integration; do not replace
-or disable the existing security or LFS hooks.
+Keep installed skills self-contained: their references and assets must live
+inside the skill directory. Do not introduce a dependency on a sibling checkout,
+consumer list or privileged service. The setup skill uses a template as advice,
+then adapts the result to the target repository. It must not silently reconfigure
+branch protections or change the user's existing hooks.
 
-Use a short `codex/` branch and a PR. A human must explicitly approve each central
-PR's final checked diff in chat or GitHub. Any later edits require approval again;
-the agent may merge the approved commit after confirming its SHA and checks.
-Exact downstream copies need no repeated approval and may merge automatically.
-Read [automation.md](automation.md) before changing sync or enforcement.
+Use Python 3.11+ and pre-commit 4.7.0 for development. Install the local hooks with
+`pre-commit install`, then run `pre-commit run --all-files`. If another tool owns
+`core.hooksPath`, use its supported integration; preserve security and LFS hooks.
+CI runs the same checks on Linux, Windows and macOS; the `verify` check is required.
+The credential guard itself uses Python 3.9+ and the standard library.
+
+For a new or changed skill, also run your agent's bundled skill validator and
+check its behavior against realistic requests: creating a new project, updating
+an existing one without losing rules, and ordinary coding that must not invoke
+the setup skill. Structural validation alone does not prove correct behavior.
+Documentation and template edits do not need new unit tests.
+
+Use a short `codex/` branch and a PR. A human explicitly approves the final
+checked diff of each PR here, in chat or GitHub. Later edits require approval
+again. Do not publish a package or create a release unless explicitly requested.

@@ -19,13 +19,13 @@ repos:
       - id: ruff-format
   - repo: local
     hooks:
-      - id: standards-secrets
+      - id: credential-patterns
         name: Reject private keys and recognizable credential tokens
         entry: hooks/check-secrets
         language: script
         types: [text]
       - id: python-tests
-        name: Standards regression tests
+        name: Credential guard regression test
         entry: python3 -m unittest discover -s tests
         language: system
         pass_filenames: false

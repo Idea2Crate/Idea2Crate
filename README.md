@@ -1,47 +1,68 @@
-# Idea2Crate Standards
+# Idea2Crate
 
-One reviewed source for shared agent instructions, skills and pre-commit checks.
-Idea2Crate turns ideas and real needs into working, verifiable software with
-agents. Projects have independent goals and designs; replicating an existing
-product is outside our scope.
+Reusable tools, skills and templates for turning ideas into working, verifiable
+software with agents. Independent products live in their own repositories.
+Projects have their own goals and designs; replicating an existing product is
+outside our scope. Reuse compatible open-source components with attribution.
 
-Edit common rules here. Each enrolled repository receives an identical root
-`AGENTS.md`, shared skills, a generated pre-commit configuration and a separate
-source lockfile. Format version 2 uses `.agents/skills/idea2crate-*` for shared skills and
-`.idea2crate/LICENSE` for their source notice; other skill names remain owned by
-the project. Project-specific requirements live in `docs/project.md` and the
-documents it links to.
+Each repository maintains its own `AGENTS.md`, hooks and CI. Use these resources
+when needed; this repository does not synchronize or enforce project rules.
 
-After a central merge, automation opens or updates one sync PR per repository.
-Each central PR first needs human approval of its final checked diff, in chat or
-GitHub. Any later edits require renewed approval.
-An independent GitHub App check validates the exact payload, then enables
-auto-merge subject to all required checks. Normal contributors cannot merge
-unapproved changes to managed copies. Routine syncs need maintainer attention
-for conflicts and failures; explicit enrollment and format migration are reviewed
-separately.
+## Available skill
 
-Approved source revisions using the current format remain valid during rollout. A reviewed
-`revoked_revisions` entry withdraws a specific source version, with a reason;
-the next reconciliation rejects it while allowing an exact upgrade to repair
-the installed version. Neither synchronization nor revocation is atomic across
-repositories.
+[`idea2crate-repo-setup`](skills/idea2crate-repo-setup/SKILL.md) creates a new
+project's development setup or updates an existing project's instructions and
+checks. Invoke it explicitly; it is not part of ordinary application changes.
+It adapts a baseline to the project and preserves existing project requirements.
 
-Only the current bundle format is supported. The two existing repositories are
-migrated explicitly; runtime code does not reconstruct previous formats. See
-[enrollment](docs/enrollment.md) for the reviewed migration procedure.
+Examples:
 
-```sh
-python3 -m unittest discover -s tests -v
-python3 -m standards plan --repository Idea2Crate/Snip2Pin
+```text
+Use $idea2crate-repo-setup to prepare a new Rust library from this idea:
+<purpose and intended users>. Create local files only.
+
+Use $idea2crate-repo-setup to update this repository's contribution rules.
+Keep its product requirements and existing checks; show the resulting diff.
 ```
 
-Read [development](docs/project.md), [setup and trust model](docs/automation.md)
-and [enrollment](docs/enrollment.md). Python 3.9+ and Git are required. There are
-no third-party runtime Python dependencies. No package publication is required.
+## Project-local installation
 
-The default checker uses central GitHub Actions on a ten-minute schedule and
-after central merges. GitHub may delay scheduled runs; this is not an instant
-webhook service. Required checks remain pending until validation runs, and no
-target PR can grant itself a successful check. A maintainer can run the central
-workflow manually when an immediate result is needed.
+Ask your agent's skill installer to install from:
+
+- Repository: `Idea2Crate/Idea2Crate`.
+- Path: `skills/idea2crate-repo-setup`.
+- Revision: a full reviewed commit SHA.
+- Destination: the target repository's `.agents/skills/` directory.
+
+For Codex, use the bundled `skill-installer` with those inputs. The helper accepts
+`--repo`, `--path`, `--ref` and `--dest`; have the agent locate its bundled script
+rather than putting a machine-specific script path into project instructions.
+Downloading the skill does not require a persistent clone of this repository.
+The installer may download a repository archive to extract the selected path.
+
+Add this rule to the target project's `.gitignore`:
+
+```gitignore
+/.agents/skills/idea2crate-*/
+```
+
+Installed skills are local dependencies, not project contributions. Preserve
+their bundled `LICENSE`. Do not overwrite an existing installation or local
+edits without inspection. Updating an installed skill does not itself update
+project rules: a human must invoke it for that task. Project-owned skills with
+other names can remain tracked normally. New clones and worktrees need their own
+local installation.
+
+This skill needs no custom installer, package publication, organization Secret,
+GitHub App, consumer registry or synchronization workflow. Projects decide when
+to use it and own the resulting files without a runtime dependency here.
+
+## Adding reusable tools
+
+Add a tool or template when an actual task needs it. Document its purpose,
+inputs, outputs, dependencies and verification alongside it. Keep standalone
+products in separate repositories rather than growing this into a shared
+application runtime. Skills may bundle supporting scripts when they are useful
+to that workflow.
+
+See [development](docs/project.md) for this repository's own checks.
