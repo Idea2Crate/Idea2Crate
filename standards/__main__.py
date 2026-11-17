@@ -65,7 +65,9 @@ def main():
         if not args.repository or not args.pull:
             parser.error("check-pr requires --repository and --pull")
         return int(not check_pull(api, source, args.repository, args.pull, bot_id))
-    failures = reconcile(api, source, bot_id, sync=args.sync)
+    failures = reconcile(
+        api, source, bot_id, sync=args.sync, repository=args.repository
+    )
     for error in failures:
         print(error, file=sys.stderr)
     return int(bool(failures))

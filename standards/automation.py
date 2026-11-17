@@ -6,11 +6,12 @@ from .bundle import (
     LOCK,
     SOURCE,
     SYNC_BRANCH,
+    OperationError,
     PolicyError,
     payload,
-    protected,
     read_lock,
     registry,
+    require_active,
     verify_tree,
 )
 
@@ -19,8 +20,20 @@ def differences(before, after):
     return {p for p in set(before) | set(after) if before.get(p) != after.get(p)}
 
 
-def same_head(left, right):
-    return left["head"]["sha"] == right["head"]["sha"] and left["state"] == "open"
+def same_pull(left, right):
+    def identity(pr):
+        return (
+            pr["state"],
+            pr["user"]["id"],
+            pr.get("draft", False),
+            pr["base"]["repo"]["full_name"],
+            pr["base"]["ref"],
+            (pr["head"]["repo"] or {}).get("full_name"),
+            pr["head"]["ref"],
+            pr["head"]["sha"],
+        )
+
+    return right["state"] == "open" and identity(left) == identity(right)
 
 
 def validate(api, source, repository, pr, bot_id):
@@ -37,11 +50,15 @@ def validate(api, source, repository, pr, bot_id):
     if LOCK not in after:
         raise PolicyError("Repository must complete standards enrollment first")
     lock = read_lock(api.blob(repository, after[LOCK][1]), repository)
+    require_active(source, lock["revision"])
     expected = payload(source, lock["revision"], repository)
     verify_tree(after, expected)
-    # Onboarding is an explicitly approved full head SHA in the central registry,
-    # not a target-controlled flag. It can run only before a baseline is installed.
-    bootstrap = LOCK not in before and config.get("bootstrap_head") == pr["head"]["sha"]
+    # Explicit enrollment approval is bound to both target head and current base.
+    # It may also authorize a reviewed format migration without interpreting it.
+    bootstrap = (
+        config.get("bootstrap_head") == pr["head"]["sha"]
+        and config.get("bootstrap_base") == base_sha
+    )
     changed = differences(before, after)
     if bootstrap:
         if "docs/project.md" not in after:
@@ -56,7 +73,7 @@ def validate(api, source, repository, pr, bot_id):
     old_lock = read_lock(api.blob(repository, before[LOCK][1]), repository)
     old_expected = payload(source, old_lock["revision"], repository)
     verify_tree(before, old_expected)
-    policy_changes = {p for p in changed if protected(p)}
+    policy_changes = changed & (set(old_expected) | set(expected))
     if not policy_changes:
         return base_sha, "Managed files match the installed approved revision", False
     if (
@@ -84,24 +101,30 @@ def check_pull(api, source, repository, number, bot_id, merge=False):
     try:
         base_sha, summary, sync = validate(api, source, repository, pr, bot_id)
         fresh = api.pull(repository, number)
-        if not same_head(pr, fresh):
-            raise PolicyError(
-                "PR head changed during validation; a new check is required"
+        if not same_pull(pr, fresh):
+            raise OperationError(
+                "PR changed during validation; a new check is required"
             )
         branch = registry(source, source.head)[repository]["branch"]
         if api.branch(repository, branch)["object"]["sha"] != base_sha:
-            raise PolicyError(
+            raise OperationError(
                 "Base branch changed during validation; retry on the current base"
             )
+        api.check(repository, sha, "success", summary)
+        if merge and sync and not fresh.get("draft") and not fresh.get("auto_merge"):
+            # GitHub cannot atomically bind this mutation to a PR snapshot.
+            # Recheck its full identity and the enrolled base before enabling it.
+            if (
+                not same_pull(pr, api.pull(repository, number))
+                or api.branch(repository, branch)["object"]["sha"] != base_sha
+            ):
+                raise OperationError("PR changed before auto-merge could be enabled")
+            api.enable_auto_merge(pr["node_id"])
     except PolicyError as error:
         api.check(repository, sha, "failure", str(error))
+        if isinstance(error, OperationError):
+            raise
         return False
-    api.check(repository, sha, "success", summary)
-    if merge and sync and not pr.get("draft") and not pr.get("auto_merge"):
-        # GitHub still enforces every required CI check, review and thread.
-        if not same_head(pr, api.pull(repository, number)):
-            raise PolicyError("PR changed before auto-merge could be enabled")
-        api.enable_auto_merge(pr["node_id"])
     return True
 
 
@@ -169,23 +192,34 @@ def sync_repository(api, source, repository, bot_id):
         commit = api.request("GET", prefix + "/git/commits/" + old_ref["object"]["sha"])
         if len(commit["parents"]) not in {1, 2}:
             raise PolicyError("Sync branch has unexpected history")
-        parent = api.tree(repository, commit["parents"][-1]["sha"])
+        parent_sha = commit["parents"][-1]["sha"]
+        if not api.is_ancestor(repository, parent_sha, base_sha):
+            raise PolicyError(
+                "Sync baseline is outside the enrolled branch; refusing to overwrite it"
+            )
+        parent = api.tree(repository, parent_sha)
         branch_tree = api.tree(repository, old_ref["object"]["sha"])
-        if any(not protected(p) for p in differences(parent, branch_tree)):
+        branch_lock = read_lock(api.blob(repository, branch_tree[LOCK][1]), repository)
+        branch_expected = payload(source, branch_lock["revision"], repository)
+        verify_tree(branch_tree, branch_expected)
+        managed = set(branch_expected) | set(expected) | set(old_expected)
+        if differences(parent, branch_tree) - managed:
             raise PolicyError(
                 "Sync branch contains unrelated changes; refusing to overwrite them"
             )
-        branch_lock = read_lock(api.blob(repository, branch_tree[LOCK][1]), repository)
-        verify_tree(branch_tree, payload(source, branch_lock["revision"], repository))
         try:
             verify_tree(branch_tree, expected)
-            if existing and all(protected(p) for p in differences(before, branch_tree)):
-                check_pull(
-                    api, source, repository, existing["number"], bot_id, merge=True
-                )
-                return existing["number"]
         except PolicyError:
             pass
+        else:
+            if existing and not differences(before, branch_tree) - managed:
+                if not check_pull(
+                    api, source, repository, existing["number"], bot_id, merge=True
+                ):
+                    raise OperationError(
+                        "Sync PR was rejected; inspect its failed check"
+                    )
+                return existing["number"]
     entries = []
     for path in sorted(set(old_expected) | set(expected)):
         data = expected.get(path)
@@ -244,18 +278,22 @@ def sync_repository(api, source, repository, bot_id):
                 "title": "chore(standards): sync approved development rules",
                 "head": SYNC_BRANCH,
                 "base": config["branch"],
-                "body": "Updates shared instructions, skills and pre-commit checks from [the approved source](https://github.com/%s/commit/%s).\n\nOnly centrally managed files change. Required checks must pass before auto-merge.\n"
+                "body": "Problem:\n- Shared rules are behind the approved central revision.\n\nFix:\n- Synchronize instructions, skills and checks from [the approved source](https://github.com/%s/commit/%s).\n"
                 % (SOURCE, source.head),
             },
         )
         number = pr["number"]
-    check_pull(api, source, repository, number, bot_id, merge=True)
+    if not check_pull(api, source, repository, number, bot_id, merge=True):
+        raise OperationError("Sync PR was rejected; inspect its failed check")
     return number
 
 
-def reconcile(api, source, bot_id, sync=False):
+def reconcile(api, source, bot_id, sync=False, repository=None):
     failures = []
-    for repository in registry(source, source.head):
+    repositories = registry(source, source.head)
+    if repository is not None and repository not in repositories:
+        raise PolicyError("Repository is not enrolled")
+    for repository in [repository] if repository is not None else repositories:
         if sync:
             try:
                 sync_repository(api, source, repository, bot_id)
@@ -268,7 +306,16 @@ def reconcile(api, source, bot_id, sync=False):
                 % (repository, quote(branch, safe=""))
             )
             for pr in pulls:
-                check_pull(api, source, repository, pr["number"], bot_id, merge=True)
+                try:
+                    accepted = check_pull(
+                        api, source, repository, pr["number"], bot_id, merge=True
+                    )
+                    if not accepted and pr["user"]["id"] == bot_id:
+                        failures.append(
+                            repository + ": App PR failed policy validation"
+                        )
+                except PolicyError as error:
+                    failures.append(repository + ": " + str(error))
         except PolicyError as error:
             failures.append(repository + ": " + str(error))
     return failures

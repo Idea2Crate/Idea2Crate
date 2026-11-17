@@ -12,9 +12,9 @@ from standards.bundle import (
     LOCK,
     SOURCE,
     SYNC_BRANCH,
+    OperationError,
     PolicyError,
     payload,
-    verify_tree,
 )
 from standards.secrets import scan
 
@@ -35,7 +35,7 @@ class Source:
         root = Path(__file__).resolve().parents[1]
         files = {
             p: (root / p).read_bytes()
-            for p in ("AGENTS.md", "profiles.json", "repositories.json")
+            for p in ("AGENTS.md", "LICENSE", "profiles.json", "repositories.json")
         }
         for path in (root / ".agents/skills").rglob("*"):
             if path.is_file():
@@ -55,6 +55,7 @@ class Source:
     def bootstrap(self, sha):
         registry = json.loads(self.versions[NEW]["repositories.json"])
         registry["repositories"][REPO]["bootstrap_head"] = sha
+        registry["repositories"][REPO]["bootstrap_base"] = BASE
         self.versions[NEW]["repositories.json"] = json.dumps(registry).encode()
 
 
@@ -80,6 +81,7 @@ class Api:
         self.merges = []
         self.pull_calls = 0
         self.change_head_at = None
+        self.retarget_at = None
         self.branch_calls = 0
         self.change_base_at = None
 
@@ -108,6 +110,8 @@ class Api:
         result = copy.deepcopy(self.pr)
         if self.change_head_at == self.pull_calls:
             result["head"]["sha"] = "f" * 40
+        if self.retarget_at == self.pull_calls:
+            result["base"]["ref"] = "staging"
         return result
 
     def check(self, repository, sha, conclusion, summary):
@@ -120,7 +124,11 @@ class Api:
         self.pr["user"]["id"] = BOT
         self.pr["head"]["ref"] = SYNC_BRANCH
         self.trees[HEAD] = {
-            **self.trees[BASE],
+            **{
+                p: value
+                for p, value in self.trees[BASE].items()
+                if p not in payload(source, OLD, REPO)
+            },
             **self.make_tree(payload(source, NEW, REPO)),
         }
 
@@ -153,7 +161,7 @@ class PolicyTests(unittest.TestCase):
             "AGENTS.override.md",
             "src/AGENTS.md",
             "src/agents.MD",
-            ".agents/skills/custom/SKILL.md",
+            ".agents/skills/idea2crate-custom/SKILL.md",
         ):
             with self.subTest(path=path):
                 api = Api(self.source)
@@ -194,13 +202,48 @@ class PolicyTests(unittest.TestCase):
 
     def test_head_change_cannot_receive_success_for_new_head(self):
         self.api.change_head_at = 2
-        self.assertFalse(check_pull(self.api, self.source, REPO, 1, BOT))
+        with self.assertRaises(OperationError):
+            check_pull(self.api, self.source, REPO, 1, BOT)
         self.assertEqual(self.api.checks[-1][0:2], (HEAD, "failure"))
 
     def test_base_change_is_not_approved(self):
         self.api.change_base_at = 2
-        self.assertFalse(check_pull(self.api, self.source, REPO, 1, BOT))
+        with self.assertRaises(OperationError):
+            check_pull(self.api, self.source, REPO, 1, BOT)
         self.assertEqual(self.api.checks[-1][1], "failure")
+
+    def test_retargeting_sync_never_enables_auto_merge(self):
+        for when in (2, 3):
+            with self.subTest(read=when):
+                api = Api(self.source)
+                api.set_sync(self.source)
+                api.retarget_at = when
+                with self.assertRaises(OperationError):
+                    check_pull(api, self.source, REPO, 1, BOT, merge=True)
+                self.assertEqual(api.merges, [])
+                self.assertEqual(api.checks[-1][1], "failure")
+
+    def test_project_skills_are_allowed_but_central_namespace_is_reserved(self):
+        source = Source()
+        api = Api(source)
+        api.trees[HEAD][".agents/skills/project-build/SKILL.md"] = (
+            "100644",
+            git_blob(b"project instructions"),
+        )
+        self.assertTrue(check_pull(api, source, REPO, 1, BOT))
+        api.trees[HEAD][".agents/skills/idea2crate-custom/SKILL.md"] = (
+            "100644",
+            git_blob(b"unapproved shared skill"),
+        )
+        self.assertFalse(check_pull(api, source, REPO, 1, BOT))
+
+    def test_sync_cannot_smuggle_project_skills(self):
+        self.api.set_sync(self.source)
+        self.api.trees[HEAD][".agents/skills/project-build/SKILL.md"] = (
+            "100644",
+            git_blob(b"unreviewed project code"),
+        )
+        self.rejected()
 
     def test_bootstrap_needs_exact_central_approval(self):
         self.api = Api(self.source, installed=False)
@@ -218,8 +261,23 @@ class PolicyTests(unittest.TestCase):
 
     def test_spent_bootstrap_does_not_authorize_later_policy_edits(self):
         self.source.bootstrap(HEAD)
+        self.api.base = "e" * 40
+        self.api.trees[self.api.base] = copy.deepcopy(self.api.trees[BASE])
         self.api.trees[HEAD].update(self.api.make_tree(payload(self.source, NEW, REPO)))
         self.rejected()
+
+    def test_exact_enrollment_grant_allows_replacing_an_unreadable_old_baseline(self):
+        self.api.trees[BASE].update(
+            self.api.make_tree({LOCK: b"uninterpreted old format"})
+        )
+        self.api.trees[BASE]["docs/project.md"] = (
+            "100644",
+            git_blob(b"preserved project instructions"),
+        )
+        self.api.set_sync(self.source)
+        self.rejected()
+        self.source.bootstrap(HEAD)
+        self.assertTrue(check_pull(self.api, self.source, REPO, 1, BOT))
 
     def test_precommit_uses_immutable_source_and_keeps_project_checks(self):
         config = json.loads(
@@ -254,23 +312,17 @@ class PolicyTests(unittest.TestCase):
     def test_secret_guard_does_not_echo_credentials(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "fixture.txt"
-            fake = "gh" + "p_" + "a" * 36
-            path.write_text(fake)
-            errors = io.StringIO()
-            with redirect_stderr(errors):
-                self.assertEqual(scan([str(path)]), 1)
-            self.assertNotIn(fake, errors.getvalue())
+            for fake in (
+                "gh" + "p_" + "a" * 36,
+                "gh" + "s_123456_" + "eyJhbGciOiJSUzI1NiJ9.eyJleHAiOjF9.c3ludGhldGlj",
+            ):
+                path.write_text(fake)
+                errors = io.StringIO()
+                with redirect_stderr(errors):
+                    self.assertEqual(scan([str(path)]), 1)
+                self.assertNotIn(fake, errors.getvalue())
             path.write_text("ordinary source")
             self.assertEqual(scan([str(path)]), 0)
-
-    def test_retired_skill_is_removed_from_expected_payload(self):
-        skill = ".agents/skills/retired/SKILL.md"
-        self.source.versions[OLD][skill] = b"retired"
-        old = self.api.make_tree(payload(self.source, OLD, REPO))
-        new = payload(self.source, NEW, REPO)
-        with self.assertRaises(PolicyError):
-            verify_tree(old, new)
-        self.assertNotIn(skill, new)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ from pathlib import Path
 PATTERNS = (
     re.compile(rb"-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----"),
     re.compile(rb"\bgh[pousr]_[A-Za-z0-9]{36,}\b"),
+    re.compile(rb"\bghs_[0-9]+_[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b"),
     re.compile(rb"\bgithub_pat_[A-Za-z0-9_]{60,}\b"),
     re.compile(rb"\bAKIA[A-Z0-9]{16}\b"),
     re.compile(rb"\bxox[baprs]-[A-Za-z0-9-]{20,}\b"),
