@@ -16,9 +16,10 @@ Cargo.lock, generates JS bindings, and writes an embed expression to OUT_DIR.
 WASM child builds skip bundling to avoid recursion.
 
 A separate target directory under OUT_DIR prevents nested Cargo lock contention.
-The package's normal source tracking triggers rebuilds. For inputs outside the
-package, use build.rs rerun declarations that cover both package and external
-inputs. `Builder` configures default/Web-only Cargo features when needed.
+Cargo's depfile tracks transitive local sources, included assets and manifests
+so shared-library edits refresh the embedded app too. Project-specific code
+generators still declare their own extra inputs in build.rs. `Builder`
+configures default/Web-only Cargo features when needed.
 
 No compiler, source tree or binding generator is required at runtime. This
 build-only dependency does not become part of the executable. It currently uses

@@ -107,9 +107,8 @@ egui_web_sandbox_build::Builder::default()
 
 构建器需要当前 package 有 cdylib library，沿用 Cargo.lock；生成的网页、嵌入代码及
 嵌套构建产物均写入 Cargo OUT_DIR。
-当前 package 源码变化使用 Cargo 默认的 package 跟踪；引用包外的共享源码或资源时，
-应在 build.rs 声明对应的 `cargo:rerun-if-changed`，同时保留对本 package 输入的声明。
-完整示例采用同一 package 内的源码，不需要额外声明。
+构建器跟踪 Cargo 记录的源文件、包含的资源和本地共享库，修改后会重新嵌入 WASM。
+项目自己的代码生成器读取的额外输入，仍按 Cargo 的惯例在 build.rs 声明。
 
 服务器默认使用空闲端口。固定端口或集成到项目自身生命周期时，使用
 `server::Server::bind(include_app!(), port)`，通过 `url()` 取得地址，

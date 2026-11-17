@@ -1,5 +1,6 @@
 //! Build-script integration for a self-contained egui Web server executable.
 use std::{
+    collections::BTreeSet,
     env,
     error::Error,
     fs,
@@ -125,6 +126,45 @@ impl Builder {
             return Err("WASM build failed; install wasm32-unknown-unknown and adapt native-only services for Web".into());
         }
         let wasm = artifact.ok_or("Web entry needs [lib] crate-type = [\"cdylib\", \"rlib\"] and an exported async start()")?;
+        // Cargo's depfile includes the actual transitive local sources and included
+        // assets. Follow it so changing a shared App library also refreshes WASM.
+        let dependencies = fs::read_to_string(wasm.with_extension("d"))?;
+        // The output filename is irrelevant; normalize its rule target so a
+        // Windows drive colon is not mistaken for the dependency separator.
+        let (_, dependencies) = dependencies
+            .split_once(": ")
+            .ok_or("invalid Cargo depfile rule")?;
+        let dependencies = format!("web: {dependencies}");
+        let dependencies = depfile::parse(&dependencies)
+            .map_err(|position| format!("invalid Cargo depfile at byte {position}"))?;
+        let workspace = PathBuf::from(
+            metadata["workspace_root"]
+                .as_str()
+                .ok_or("missing Cargo workspace")?,
+        );
+        let mut inputs = BTreeSet::from([
+            manifest.clone(),
+            workspace.join("Cargo.toml"),
+            workspace.join("Cargo.lock"),
+        ]);
+        for (_, dependencies) in dependencies.iter() {
+            for path in dependencies {
+                let path = project.join(path.as_ref());
+                if path.starts_with(&output) {
+                    continue;
+                }
+                if let Some(root) = path
+                    .ancestors()
+                    .find(|path| path.join("Cargo.toml").is_file())
+                {
+                    inputs.insert(root.join("Cargo.toml"));
+                }
+                inputs.insert(path);
+            }
+        }
+        for input in inputs {
+            println!("cargo:rerun-if-changed={}", input.display());
+        }
         let site = output.join("site");
         if site.exists() {
             fs::remove_dir_all(&site)?;
@@ -149,8 +189,6 @@ impl Builder {
         }
         embedded.push_str("]\n");
         fs::write(output.join("egui_web_sandbox.rs"), embedded)?;
-        // Keep Cargo's default package-wide source tracking. Projects with inputs
-        // outside this package can use their usual build.rs rerun declarations.
         Ok(())
     }
 }
