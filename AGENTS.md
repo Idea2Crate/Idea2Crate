@@ -46,7 +46,8 @@ outside our scope. Reuse compatible open-source components with attribution.
   merely restate the implementation.
 - Add unit tests only for important, error-prone behavior. Code complexity,
   checkpoints or network requests alone do not justify adding tests.
-- Test observable inputs, outputs and behavior. Avoid checking internal fields
+- Test observable behavior and failure boundaries, not a copy of the
+  implementation. Focus on inputs and outputs; avoid checking internal fields
   one by one, implementation details or every conditional branch.
 - Prefer existing checks, targeted smoke tests and verification with real inputs
   and outputs.
@@ -55,9 +56,10 @@ outside our scope. Reuse compatible open-source components with attribution.
 - When changing related logic, simplify or remove redundant, obsolete or brittle
   tests, including tests that repeat behavior already handled by shared libraries
   or frameworks.
-- Run tests appropriate to the change and the project's required checks. Once
-  relevant checks pass, broaden or repeat testing only for new changes, failures
-  or unresolved concerns.
+- Run the project's formatter, lint and relevant tests. Keep tests appropriate
+  to the change and run the project's required checks. Once relevant checks
+  pass, broaden or repeat testing only for new changes, failures or unresolved
+  concerns.
 
 ## Git, checks and publication
 
