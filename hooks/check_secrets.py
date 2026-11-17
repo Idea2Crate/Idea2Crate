@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Reject recognizable credential patterns without printing the matched value."""
 
 import re

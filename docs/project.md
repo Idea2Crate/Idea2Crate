@@ -8,7 +8,7 @@ central policy service. Repository setup skills are explicitly invoked.
   asset and license needed to create or update a project's development setup.
 - `AGENTS.md`: this repository's own instructions, independently maintained.
 - `.pre-commit-config.yaml`: this repository's checks, not an exported profile.
-- `hooks/check-secrets`: a local credential-pattern guard. It complements
+- `hooks/check_secrets.py`: a local credential-pattern guard. It complements
   GitHub secret scanning and push protection, not a complete secret scanner.
 - `tests/test_secrets.py`: the existing observable credential rejection check.
 
@@ -21,7 +21,7 @@ branch protections or change the user's existing hooks.
 Use Python 3.11+ and pre-commit 4.7.0 for development. Install the local hooks with
 `pre-commit install`, then run `pre-commit run --all-files`. If another tool owns
 `core.hooksPath`, use its supported integration; preserve security and LFS hooks.
-CI runs the same checks on Linux, Windows and macOS; the `verify` check is required.
+CI runs these checks in one Ubuntu `verify` job, which is required for merging.
 The credential guard itself uses Python 3.9+ and the standard library.
 
 For a new or changed skill, also run your agent's bundled skill validator and
