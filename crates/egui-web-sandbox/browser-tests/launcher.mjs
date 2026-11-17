@@ -1,0 +1,74 @@
+import assert from 'node:assert/strict';
+import {chromium} from 'playwright';
+import {SandboxPage} from '../browser/client.mjs';
+
+const origin = process.env.SANDBOX_URL ?? 'http://127.0.0.1:8765';
+const browser = await chromium.launch({headless: true,
+  ...(process.env.CHROMIUM_EXECUTABLE ? {executablePath: process.env.CHROMIUM_EXECUTABLE} : {})});
+const context = await browser.newContext({viewport: {width: 1000, height: 720}});
+const page = await context.newPage();
+const errors = [];
+page.on('pageerror', error => errors.push(String(error)));
+
+try {
+  await page.goto(`${origin}/starter/`);
+  await page.locator('#status').waitFor({state: 'detached'});
+  const app = new SandboxPage(page);
+  await app.ready();
+  await app.control('TextInput', 'Title').fill('A reusable app');
+  await app.control('Button', 'Save').click();
+  await page.waitForFunction(() => window.eguiSandbox.snapshot().controls.some(c => c.label === 'Saved: A reusable app'));
+
+  // A duplicate startup must preserve the currently running app.
+  const duplicate = await page.evaluate(async () => {
+    try { await (await import('/starter/app.js')).start(); }
+    catch (error) { return String(error); }
+  });
+  assert.match(duplicate, /already has a sandbox bridge/);
+  assert.equal((await app.control('TextInput', 'Title').read()).value, 'A reusable app');
+
+  // Browser history may retain a page; only a final pagehide unmounts it.
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', {persisted: true})));
+  assert.equal((await app.control('TextInput', 'Title').read()).value, 'A reusable app');
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
+  assert.equal(await page.evaluate(() => typeof window.eguiSandbox), 'undefined');
+
+  // Constructor failure must leave the page reusable, and the shell must show the error.
+  const failure = await page.evaluate(async () => {
+    const status = document.createElement('div');
+    status.id = 'status';
+    document.body.append(status);
+    const {mount} = await import('/starter/launch.mjs');
+    try { await mount(() => import('/failure/failure.js')); }
+    catch (error) { return {error: String(error), status: status.textContent, bridge: typeof window.eguiSandbox}; }
+  });
+  assert.match(failure.error, /fixture constructor failed/);
+  assert.match(failure.status, /Loading failed/);
+  assert.equal(failure.bridge, 'undefined');
+
+  await page.evaluate(async () => {
+    const module = await import('/starter/app.js');
+    const previous = await module.start();
+    previous.destroy();
+    previous.destroy();
+    const current = await module.start();
+    previous.destroy();
+    previous.free();
+    current.free();
+    const {mount} = await import('/starter/launch.mjs');
+    const stop = await mount(() => import('/starter/app.js'));
+    stop();
+    stop();
+    await mount(() => import('/starter/app.js'));
+  });
+  await app.ready();
+  assert.equal((await app.control('TextInput', 'Title').read()).value, 'First note');
+  await app.control('TextInput', 'Title').fill('Restarted');
+  await app.control('Button', 'Save').click();
+  await page.waitForFunction(() => window.eguiSandbox.snapshot().controls.some(c => c.label === 'Saved: Restarted'));
+  assert.deepEqual(errors, []);
+  console.log('PASS: factory-only launcher, App logic, duplicate startup, page lifecycle, constructor failure, error display and restart');
+} finally {
+  await context.close();
+  await browser.close();
+}

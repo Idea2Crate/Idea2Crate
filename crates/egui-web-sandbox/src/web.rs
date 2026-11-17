@@ -3,6 +3,21 @@ use super::*;
 use wasm_bindgen::{JsCast, prelude::*};
 type ClipboardHandler = Closure<dyn Fn(web_sys::ClipboardEvent)>;
 
+#[cfg(feature = "launcher")]
+mod launcher;
+#[cfg(feature = "launcher")]
+pub use launcher::{WebApp, launch, launch_on};
+
+fn available_document() -> Result<web_sys::Document, JsValue> {
+    let window = web_sys::window().ok_or_else(|| JsValue::from_str("window unavailable"))?;
+    if js_sys::Reflect::has(&window, &"eguiSandbox".into())? {
+        return Err(JsValue::from_str("this page already has a sandbox bridge"));
+    }
+    window
+        .document()
+        .ok_or_else(|| JsValue::from_str("document unavailable"))
+}
+
 /// Owns `window.eguiSandbox` for this page. Dropping it removes the bridge.
 pub struct AgentBridge {
     _snapshot: Closure<dyn Fn() -> JsValue>,
@@ -10,16 +25,11 @@ pub struct AgentBridge {
     document: web_sys::Document,
     key: Closure<dyn Fn(web_sys::KeyboardEvent)>,
     clipboard: Vec<(&'static str, ClipboardHandler)>,
+    object: js_sys::Object,
 }
 impl AgentBridge {
     pub fn install(ctx: &Context, sandbox: &Sandbox) -> Result<Self, JsValue> {
-        let window = web_sys::window().ok_or_else(|| JsValue::from_str("window unavailable"))?;
-        if js_sys::Reflect::has(&window, &"eguiSandbox".into())? {
-            return Err(JsValue::from_str("this page already has a sandbox bridge"));
-        }
-        let document = window
-            .document()
-            .ok_or_else(|| JsValue::from_str("document unavailable"))?;
+        let document = available_document()?;
         let observed = sandbox.clone();
         let snapshot = Closure::wrap(Box::new(move || {
             serde_json::to_string(&observed.snapshot())
@@ -44,11 +54,6 @@ impl AgentBridge {
         if sandbox.0.lock().reset_enabled {
             js_sys::Reflect::set(&bridge, &"reset".into(), reset.as_ref().unchecked_ref())?;
         }
-        js_sys::Reflect::set(
-            &window,
-            &"eguiSandbox".into(),
-            &js_sys::Object::freeze(&bridge),
-        )?;
         let focused = ctx.clone();
         let key = Closure::wrap(Box::new(move |event: web_sys::KeyboardEvent| {
             if focused.input(|input| input.focused)
@@ -67,6 +72,7 @@ impl AgentBridge {
             document,
             key,
             clipboard: Vec::new(),
+            object: js_sys::Object::freeze(&bridge),
         };
         bridge.document.add_event_listener_with_callback_and_bool(
             "keydown",
@@ -99,6 +105,8 @@ impl AgentBridge {
             )?;
             bridge.clipboard.push((name, handler));
         }
+        let window = web_sys::window().ok_or_else(|| JsValue::from_str("window unavailable"))?;
+        js_sys::Reflect::set(&window, &"eguiSandbox".into(), &bridge.object)?;
         Ok(bridge)
     }
 }
@@ -116,7 +124,12 @@ impl Drop for AgentBridge {
                 true,
             );
         }
-        if let Some(window) = web_sys::window() {
+        if let Some(window) = web_sys::window()
+            && js_sys::Reflect::get(&window, &"eguiSandbox".into())
+                .ok()
+                .as_ref()
+                == Some(self.object.as_ref())
+        {
             let _ = js_sys::Reflect::delete_property(&window, &"eguiSandbox".into());
         }
     }

@@ -12,6 +12,7 @@ include = ["/src/**", "/docs/**", "/examples/**", "/browser/*.mjs", "/browser-te
 
 [features]
 web = ["dep:wasm-bindgen", "dep:js-sys", "dep:web-sys"]
+launcher = ["web", "dep:eframe"]
 
 [dependencies]
 egui = { version = "0.37.0", default-features = false }
@@ -22,15 +23,20 @@ serde_json = "1.0"
 wasm-bindgen = { version = "0.2", optional = true }
 js-sys = { version = "0.3", optional = true }
 web-sys = { version = "0.3", optional = true, features = ["Window", "Document", "HtmlCanvasElement", "KeyboardEvent", "ClipboardEvent"] }
+eframe = { version = "0.37.0", optional = true, default-features = false, features = ["glow", "default_fonts"] }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
-eframe = { version = "0.37.0", default-features = false, features = ["glow", "default_fonts"] }
 wasm-bindgen-futures = "0.4"
 
 [[example]]
 name = "basic"
 crate-type = ["cdylib"]
-required-features = ["web"]
+required-features = ["launcher"]
+
+[[example]]
+name = "startup_failure"
+crate-type = ["cdylib"]
+required-features = ["launcher"]
 
 [lints.rust]
 unsafe_code = "forbid"

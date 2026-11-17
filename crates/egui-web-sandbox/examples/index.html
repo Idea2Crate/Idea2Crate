@@ -7,13 +7,9 @@
 <canvas id="canvas"></canvas>
 <div id="status">Loading…</div>
 <script type="module">
-import init, { start } from './basic.js';
-try {
-  await init();
-  await start(!new URL(location.href).searchParams.has('observe'));
-  document.querySelector('#status').remove();
-} catch (error) {
-  document.querySelector('#status').textContent = `Loading failed: ${error}`;
-}
+import {mount} from './launch.mjs';
+await mount(() => import('./basic.js'), {
+  args: [!new URL(location.href).searchParams.has('observe')],
+});
 </script>
 </html>

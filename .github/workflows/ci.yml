@@ -40,9 +40,12 @@ jobs:
       - name: Check native library and build standalone demo
         run: |
           cargo check --locked --workspace --lib --all-features
-          cargo build --locked -p egui-web-sandbox --example basic --features web --target wasm32-unknown-unknown
+          cargo build --locked -p egui-web-sandbox --examples --features launcher --target wasm32-unknown-unknown
           wasm-bindgen target/wasm32-unknown-unknown/debug/examples/basic.wasm --target web --no-typescript --out-dir .build/site/sandbox
           cp crates/egui-web-sandbox/examples/index.html .build/site/sandbox/index.html
+          cp crates/egui-web-sandbox/browser/launch.mjs .build/site/sandbox/launch.mjs
+          wasm-bindgen target/wasm32-unknown-unknown/debug/examples/startup_failure.wasm --target web --no-typescript --out-name failure --out-dir .build/site/failure
+          python3 templates/egui-web-app/build.py --locked --out-dir .build/site/starter
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: '24'

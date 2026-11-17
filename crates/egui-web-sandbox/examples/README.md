@@ -2,6 +2,7 @@
 
 | 场景 | 入口／源码 | 用途 |
 | --- | --- | --- |
+| 从原生 App 开始 | [完整 Web 模板](../../../templates/egui-web-app/) | 构造函数接入、HTML、资源构建、生命周期和 App logic |
 | 最小观察接入 | [Quick Start](../docs/quick-start.md#2-给已有-web-应用加观察) | 在现有 Web 创建回调安装并保留桥接，不改业务 UI |
 | 可操作、无重置的应用 | `/sandbox/?observe` | 与工作台相同的真实界面，未注册重置处理器 |
 | 可重复的完整工作台 | `/sandbox/`、[basic.rs](basic.rs) | Web 入口、桥接生命周期和外层重置适配 |

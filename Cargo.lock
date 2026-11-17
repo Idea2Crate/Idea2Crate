@@ -381,6 +381,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui-web-app"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "egui-web-sandbox",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "egui-web-sandbox"
 version = "0.1.0"
 dependencies = [

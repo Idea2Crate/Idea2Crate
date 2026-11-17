@@ -1,8 +1,8 @@
 # egui-web-sandbox
 
-Observe and test an existing egui application using normal browser mouse and
-keyboard input. People and agents use the same Rust UI in isolated browser
-contexts, without Computer Use or native services.
+Launch an egui App in the browser and test it using normal mouse and keyboard
+input. People and agents use the same Rust UI in isolated browser contexts,
+without Computer Use. The application owns native-service adapters.
 
 Maintained in [Idea2Crate/Idea2Crate](https://github.com/Idea2Crate/Idea2Crate).
 The library has its own demo, browser client and regression tests. It has no
@@ -30,6 +30,27 @@ The design has three responsibilities, within one crate:
    egui's built-in windows/embedded viewports cannot represent the application's needs.
 
 ## Attach to an existing web app
+
+For a new Web entry, use the [runnable template](../../templates/egui-web-app/).
+Its Rust entry supplies only the ordinary eframe App factory:
+
+```rust,ignore
+#[wasm_bindgen]
+pub async fn start() -> Result<egui_web_sandbox::web::WebApp, JsValue> {
+    egui_web_sandbox::web::launch(Box::new(|cc| Ok(Box::new(MyApp::new(cc))))).await
+}
+```
+
+Enable `launcher` for the eframe-based startup path. It owns WebRunner and the
+bridge while passing the App directly to eframe, preserving lifecycle hooks.
+The template includes the canvas, loading/error shell and build script; its
+builder obtains matching JS assets from Cargo, including for Git dependencies.
+Keep the returned WebApp alive until unmount; the provided `mount()` helper does
+this and releases it when stopped or when the page finally leaves. `launch_on`
+accepts a custom canvas and WebOptions. See the [quick start](docs/quick-start.md)
+for native-project adaptation, build commands and lifecycle handling.
+
+For an existing WebRunner, enable only `web` and attach the bridge directly:
 
 Use the same egui **0.37** source/version as the application. In the existing web
 creation callback, install an observer and retain its bridge alongside the app:
@@ -109,14 +130,18 @@ in `Cargo.lock`:
 
 ```sh
 rustup target add wasm32-unknown-unknown
-cargo build --locked -p egui-web-sandbox --example basic --features web --target wasm32-unknown-unknown
+cargo build --locked -p egui-web-sandbox --example basic --features launcher --target wasm32-unknown-unknown
 wasm-bindgen target/wasm32-unknown-unknown/debug/examples/basic.wasm --target web --no-typescript --out-dir .build/site/sandbox
 cp crates/egui-web-sandbox/examples/index.html .build/site/sandbox/index.html
+cp crates/egui-web-sandbox/browser/launch.mjs .build/site/sandbox/launch.mjs
 python3 -m http.server 8765 --bind 127.0.0.1 --directory .build/site
 ```
 
 Open `/sandbox/`. In `crates/egui-web-sandbox/browser-tests/`, run `npm ci --ignore-scripts`, `npx playwright install chromium --only-shell`,
-then `npm test`. `SANDBOX_URL` changes the origin, `SANDBOX_DEMO_PATH` the demo path,
+then `node parallel.mjs` for that workbench. The full `npm test` also expects the
+starter template at `/starter/` and constructor-failure fixture at `/failure/`;
+the repository CI shows their complete build commands.
+`SANDBOX_URL` changes the origin, `SANDBOX_DEMO_PATH` the workbench path,
 and `CHROMIUM_EXECUTABLE` optionally selects an existing headless Chromium binary.
 The tests exercise real form/clipboard/canvas/window input, optional reset, reload
 and independent concurrent contexts, including DPR 2. No application-specific tests

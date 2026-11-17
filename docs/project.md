@@ -7,7 +7,9 @@ central policy service. Repository setup skills are explicitly invoked.
 - `skills/idea2crate-repo-setup/`: the entry point, invocation metadata, baseline
   asset and license needed to create or update a project's development setup.
 - `crates/egui-web-sandbox/`: reusable egui observations, browser clipboard/reset
-  environment, browser client, independent demo and browser regression tests.
+  environment, optional Web launcher, browser clients and regression tests.
+- `templates/egui-web-app/`: a runnable, independently buildable Web entry with
+  a normal App factory, HTML and a builder that obtains assets from Cargo metadata.
 - `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`: the Rust workspace and its
   reproducible development toolchain; this workspace has no application dependency.
 - `AGENTS.md`: this repository's own instructions, independently maintained.
@@ -30,7 +32,9 @@ CI runs these checks in one Ubuntu `verify` job, which is required for merging.
 The credential guard itself uses Python 3.9+ and the standard library.
 
 Rust hooks run formatting and WASM Clippy. CI also checks the native library,
-builds the independent WASM demo and runs its existing parallel browser tests.
+builds the independent WASM demo and template, and runs browser interaction and
+launcher lifecycle regressions. The launcher passes App directly to eframe;
+do not replace it with a proxy that silently drops application lifecycle hooks.
 Build and run commands live in the crate's [quick start](../crates/egui-web-sandbox/docs/quick-start.md).
 Keep the browser library independent of consumers, including their manifests,
 native services and build commands. Dependents select their own compatible egui
