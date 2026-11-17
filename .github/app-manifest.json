@@ -1,9 +1,0 @@
-{
-  "name": "Idea2Crate Standards",
-  "url": "https://github.com/Idea2Crate/standards",
-  "description": "Synchronizes centrally approved development rules and checks managed files without executing contribution code.",
-  "public": false,
-  "hook_attributes": {"active": false, "url": "https://example.invalid/unused"},
-  "default_permissions": {"contents": "write", "pull_requests": "write", "checks": "write", "metadata": "read"},
-  "default_events": []
-}

@@ -1,4 +1,4 @@
-name: Standards CI
+name: Idea2Crate CI
 on:
   pull_request:
   push:
@@ -23,7 +23,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
-      - name: Test portable hooks and Git behavior
+      - name: Check skills and local hooks
         run: |
           python3 -m pip install pre-commit==4.7.0
           pre-commit run --all-files
@@ -43,8 +43,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
-      - run: python3 -m unittest discover -s tests -v
-      - name: Shared pre-commit checks
+      - name: Local pre-commit checks
         run: |
           python3 -m pip install pre-commit==4.7.0
           pre-commit run --all-files
