@@ -9,6 +9,12 @@ publish = false
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[build-dependencies]
+egui-web-sandbox-build = { version = "0.1.0", path = "../../crates/egui-web-sandbox-build" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+egui-web-sandbox = { version = "0.1.0", path = "../../crates/egui-web-sandbox", features = ["server"] }
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 egui-web-sandbox = { version = "0.1.0", path = "../../crates/egui-web-sandbox", features = ["launcher"] }
 eframe = { version = "0.37.0", default-features = false, features = ["glow", "default_fonts"] }

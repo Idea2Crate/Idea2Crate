@@ -8,8 +8,10 @@ central policy service. Repository setup skills are explicitly invoked.
   asset and license needed to create or update a project's development setup.
 - `crates/egui-web-sandbox/`: reusable egui observations, browser clipboard/reset
   environment, optional Web launcher, browser clients and regression tests.
-- `templates/egui-web-app/`: a runnable, independently buildable Web entry with
-  a normal App factory, HTML and a builder that obtains assets from Cargo metadata.
+- `crates/egui-web-sandbox-build/`: build-script API that compiles the current
+  package's WASM library and emits its embedded resources into Cargo OUT_DIR.
+- `examples/web-app/`: a self-contained server executable with an ordinary App
+  factory, automatic Web build and the native server API.
 - `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`: the Rust workspace and its
   reproducible development toolchain; this workspace has no application dependency.
 - `AGENTS.md`: this repository's own instructions, independently maintained.
@@ -31,9 +33,9 @@ development. Install the local hooks with
 CI runs these checks in one Ubuntu `verify` job, which is required for merging.
 The credential guard itself uses Python 3.9+ and the standard library.
 
-Rust hooks run formatting and WASM Clippy. CI also checks the native library,
-builds the independent WASM demo and template, and runs browser interaction and
-launcher lifecycle regressions. The launcher passes App directly to eframe;
+Rust hooks run formatting, WASM Clippy and native server/build-helper Clippy.
+CI builds the self-contained executable and browser fixtures, then runs browser
+interaction, lifecycle and empty-PATH/cwd server regressions. The launcher passes App directly to eframe;
 do not replace it with a proxy that silently drops application lifecycle hooks.
 Build and run commands live in the crate's [quick start](../crates/egui-web-sandbox/docs/quick-start.md).
 Keep the browser library independent of consumers, including their manifests,

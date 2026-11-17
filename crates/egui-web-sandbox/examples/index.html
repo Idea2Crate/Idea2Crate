@@ -8,8 +8,6 @@
 <div id="status">Loading…</div>
 <script type="module">
 import {mount} from './launch.mjs';
-await mount(() => import('./basic.js'), {
-  args: [!new URL(location.href).searchParams.has('observe')],
-});
+await mount(() => import('./basic.js'));
 </script>
 </html>

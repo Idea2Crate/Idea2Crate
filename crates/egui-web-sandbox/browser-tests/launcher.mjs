@@ -3,6 +3,8 @@ import {chromium} from 'playwright';
 import {SandboxPage} from '../browser/client.mjs';
 
 const origin = process.env.SANDBOX_URL ?? 'http://127.0.0.1:8765';
+const launcher = process.env.LAUNCHER_URL;
+assert.ok(launcher, 'Run npm test to start the embedded app server');
 const browser = await chromium.launch({headless: true,
   ...(process.env.CHROMIUM_EXECUTABLE ? {executablePath: process.env.CHROMIUM_EXECUTABLE} : {})});
 const context = await browser.newContext({viewport: {width: 1000, height: 720}});
@@ -11,7 +13,7 @@ const errors = [];
 page.on('pageerror', error => errors.push(String(error)));
 
 try {
-  await page.goto(`${origin}/starter/`);
+  await page.goto(launcher);
   await page.locator('#status').waitFor({state: 'detached'});
   const app = new SandboxPage(page);
   await app.ready();
@@ -21,7 +23,7 @@ try {
 
   // A duplicate startup must preserve the currently running app.
   const duplicate = await page.evaluate(async () => {
-    try { await (await import('/starter/app.js')).start(); }
+    try { await (await import('/app.js')).start(); }
     catch (error) { return String(error); }
   });
   assert.match(duplicate, /already has a sandbox bridge/);
@@ -34,20 +36,20 @@ try {
   assert.equal(await page.evaluate(() => typeof window.eguiSandbox), 'undefined');
 
   // Constructor failure must leave the page reusable, and the shell must show the error.
-  const failure = await page.evaluate(async () => {
+  const failure = await page.evaluate(async failureUrl => {
     const status = document.createElement('div');
     status.id = 'status';
     document.body.append(status);
-    const {mount} = await import('/starter/launch.mjs');
-    try { await mount(() => import('/failure/failure.js')); }
+    const {mount} = await import('/launch.mjs');
+    try { await mount(() => import(failureUrl)); }
     catch (error) { return {error: String(error), status: status.textContent, bridge: typeof window.eguiSandbox}; }
-  });
+  }, `${origin}/failure/failure.js`);
   assert.match(failure.error, /fixture constructor failed/);
   assert.match(failure.status, /Loading failed/);
   assert.equal(failure.bridge, 'undefined');
 
   await page.evaluate(async () => {
-    const module = await import('/starter/app.js');
+    const module = await import('/app.js');
     const previous = await module.start();
     previous.destroy();
     previous.destroy();
@@ -55,11 +57,11 @@ try {
     previous.destroy();
     previous.free();
     current.free();
-    const {mount} = await import('/starter/launch.mjs');
-    const stop = await mount(() => import('/starter/app.js'));
+    const {mount} = await import('/launch.mjs');
+    const stop = await mount(() => import('/app.js'));
     stop();
     stop();
-    await mount(() => import('/starter/app.js'));
+    await mount(() => import('/app.js'));
   });
   await app.ready();
   assert.equal((await app.control('TextInput', 'Title').read()).value, 'First note');

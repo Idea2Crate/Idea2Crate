@@ -1,0 +1,16 @@
+[package]
+name = "egui-web-sandbox-build"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+description = "Build and embed an egui sandbox Web app into its native executable"
+repository = "https://github.com/Idea2Crate/Idea2Crate"
+publish = false
+
+[dependencies]
+serde_json = "1.0"
+wasm-bindgen-cli-support = "=0.2.130"
+
+[lints.rust]
+unsafe_code = "forbid"

@@ -13,7 +13,8 @@ when needed; this repository does not synchronize or enforce project rules.
 | Resource | Purpose |
 | --- | --- |
 | [egui-web-sandbox](crates/egui-web-sandbox/) | Launch an egui App in a browser, observe controls and test real input in isolated instances |
-| [egui Web App template](templates/egui-web-app/) | A complete Web entry; provide an App factory and build against the Cargo-resolved sandbox |
+| [egui-web-sandbox-build](crates/egui-web-sandbox-build/) | Automatically build and embed a Web app into a self-contained server executable |
+| [Complete Web server example](examples/web-app/) | Run the executable and open its URL; no external HTTP server or template copying |
 | [idea2crate-repo-setup](skills/idea2crate-repo-setup/SKILL.md) | Create a project or update its development rules when explicitly invoked |
 
 The Rust crate is available as a Git dependency pinned to a reviewed commit;

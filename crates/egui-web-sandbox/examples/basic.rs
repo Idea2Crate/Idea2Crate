@@ -29,7 +29,12 @@ mod browser {
     }
 
     #[wasm_bindgen]
-    pub async fn start(resettable: bool) -> Result<WebApp, JsValue> {
+    pub async fn start() -> Result<WebApp, JsValue> {
+        let query = web_sys::window()
+            .ok_or_else(|| JsValue::from_str("window unavailable"))?
+            .location()
+            .search()?;
+        let resettable = !web_sys::UrlSearchParams::new_with_str(&query)?.has("observe");
         launch(Box::new(move |cc| {
             let sandbox = Sandbox::install(&cc.egui_ctx);
             if resettable {

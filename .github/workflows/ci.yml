@@ -37,15 +37,15 @@ jobs:
         run: |
           python3 -m pip install pre-commit==4.7.0
           pre-commit run --all-files
-      - name: Check native library and build standalone demo
+      - name: Build embedded server and browser fixtures
         run: |
           cargo check --locked --workspace --lib --all-features
+          cargo build --locked -p egui-web-app
           cargo build --locked -p egui-web-sandbox --examples --features launcher --target wasm32-unknown-unknown
           wasm-bindgen target/wasm32-unknown-unknown/debug/examples/basic.wasm --target web --no-typescript --out-dir .build/site/sandbox
           cp crates/egui-web-sandbox/examples/index.html .build/site/sandbox/index.html
           cp crates/egui-web-sandbox/browser/launch.mjs .build/site/sandbox/launch.mjs
           wasm-bindgen target/wasm32-unknown-unknown/debug/examples/startup_failure.wasm --target web --no-typescript --out-name failure --out-dir .build/site/failure
-          python3 templates/egui-web-app/build.py --locked --out-dir .build/site/starter
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: '24'
@@ -57,9 +57,6 @@ jobs:
           cd crates/egui-web-sandbox/browser-tests
           npx playwright install --with-deps chromium --only-shell
           cd "$GITHUB_WORKSPACE"
-          python3 -m http.server 8765 --bind 127.0.0.1 --directory .build/site &
-          sandbox_server=$!
-          trap 'kill "$sandbox_server"' EXIT
           npm test --prefix crates/egui-web-sandbox/browser-tests
       - name: Validate workflows
         run: |

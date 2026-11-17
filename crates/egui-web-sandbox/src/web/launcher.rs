@@ -31,7 +31,7 @@ impl Drop for WebApp {
     }
 }
 
-/// Start an App on the template's `#canvas` using eframe's default WebOptions.
+/// Start an App on the standard page's `#canvas` using eframe's default WebOptions.
 ///
 /// The factory receives the actual CreationContext. All App hooks remain owned by
 /// eframe; the launcher does not proxy or replace them. Native services and optional
