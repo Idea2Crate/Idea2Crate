@@ -31,7 +31,7 @@ cargo build --locked -p egui-web-sandbox-build --features cli --bin egui-web-san
 
 ```toml
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 egui-web-sandbox = { version = "0.1.0", git = "https://github.com/Idea2Crate/Idea2Crate", rev = "REVIEWED_COMMIT_SHA", features = ["launcher"] }
@@ -39,6 +39,8 @@ eframe = { version = "0.37", default-features = false, features = ["glow", "defa
 wasm-bindgen = "=0.2.130"
 wasm-bindgen-futures = "0.4"
 ```
+
+`cdylib` 产出交给 sandbox 的 `.wasm`。同一个库还要供其他 Rust 目标链接时，再加上 `rlib`。
 
 在库的 WASM 入口提供 App 构造函数：
 

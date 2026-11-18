@@ -163,7 +163,9 @@ impl Builder {
         if !child.wait()?.success() {
             return Err("WASM build failed; install wasm32-unknown-unknown and adapt native-only services for Web".into());
         }
-        let wasm = artifact.ok_or("Web entry needs [lib] crate-type = [\"cdylib\", \"rlib\"] and an exported async start()")?;
+        let wasm = artifact.ok_or(
+            "Web library did not produce a .wasm file; set [lib] crate-type = [\"cdylib\"]",
+        )?;
         Ok((wasm, workspace))
     }
 }
