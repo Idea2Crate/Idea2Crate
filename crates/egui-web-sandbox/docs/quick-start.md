@@ -46,9 +46,7 @@ wasm-bindgen-futures = "0.4"
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub async fn start() -> Result<egui_web_sandbox::web::WebApp, wasm_bindgen::JsValue> {
-    egui_web_sandbox::web::launch(Box::new(|cc| {
-        Ok(Box::new(MyApp::new(cc)))
-    })).await
+    egui_web_sandbox::web::launch(MyApp::new).await
 }
 ```
 
@@ -125,8 +123,11 @@ Canvas 不应有 CSS 变换或边框。`ready` 表示 egui 已产生输出，业
 
 ## 5. 已有 Web 宿主与重置
 
-已有页面可以继续使用 `web::launch(AppCreator)` 或自有 Canvas 的
-`web::launch_on(canvas, options, AppCreator)`，无需启用原生 `server`。
+已有页面可以使用 `web::launch(MyApp::new)`。需要传入其他参数时，使用
+`web::launch(move |cc| MyApp::new(cc, config))`。
+构造函数可能失败时，使用 `web::try_launch()`，传入返回装箱 App 或错误的构造函数。
+自有 Canvas 和渲染配置使用 `web::launch_on(canvas, options, app_creator)`。
+这两个入口也都接受已有的 eframe `AppCreator`。
 已有 WebRunner 则只启用 `web`，自行安装并保留 `Sandbox` 与 `AgentBridge`。
 
 启动器将 App 直接交给 eframe，保留 `logic`、输入处理、绘制和其他生命周期方法。

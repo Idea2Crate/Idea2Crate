@@ -50,7 +50,7 @@ The WASM library supplies the ordinary eframe App factory:
 ```rust,ignore
 #[wasm_bindgen]
 pub async fn start() -> Result<egui_web_sandbox::web::WebApp, JsValue> {
-    egui_web_sandbox::web::launch(Box::new(|cc| Ok(Box::new(MyApp::new(cc))))).await
+    egui_web_sandbox::web::launch(MyApp::new).await
 }
 ```
 
@@ -60,7 +60,9 @@ The native `server` feature includes the canvas, loading/error shell and browser
 client. The build helper generates bindings during embedding or command startup.
 Keep the returned WebApp alive until unmount; the provided `mount()` helper does
 this and releases it when stopped or when the page finally leaves. `launch_on`
-accepts a custom canvas and WebOptions. See the [quick start](docs/quick-start.md)
+accepts a custom canvas and WebOptions. Use `try_launch` for a factory that
+returns a boxed App or an error. Both accept an existing eframe AppCreator.
+See the [quick start](docs/quick-start.md)
 for the dependency declarations, native-project adaptation and lifecycle handling.
 
 ## Attach to an existing web app
