@@ -9,7 +9,7 @@ pub use observe::{Control, ControlRole, Snapshot, WindowSnapshot};
 pub const PROTOCOL_VERSION: u32 = 1;
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
 pub mod web;
-#[cfg(all(feature = "launcher", target_arch = "wasm32"))]
+#[cfg(feature = "launcher")]
 pub use egui_web_sandbox_macros::wasm_bindgen;
 
 #[cfg(all(feature = "launcher", target_arch = "wasm32"))]

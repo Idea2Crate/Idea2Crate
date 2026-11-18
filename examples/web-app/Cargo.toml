@@ -9,9 +9,14 @@ publish = false
 [lib]
 crate-type = ["cdylib"]
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
+[dependencies]
 egui-web-sandbox = { version = "0.1.0", path = "../../crates/egui-web-sandbox", features = ["launcher"] }
 eframe = { version = "0.37.0", default-features = false, features = ["glow", "default_fonts"] }
+
+[target.'cfg(target_os = "linux")'.dependencies.eframe]
+version = "0.37.0"
+default-features = false
+features = ["x11"]
 
 [lints.rust]
 unsafe_code = "forbid"

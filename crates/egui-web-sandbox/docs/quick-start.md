@@ -37,17 +37,16 @@ cargo build --locked -p egui-web-sandbox --features cli --bin egui-web-sandbox
 [lib]
 crate-type = ["cdylib"]
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
+[dependencies]
 egui-web-sandbox = { version = "0.1.0", git = "https://github.com/Idea2Crate/Idea2Crate", rev = "REVIEWED_COMMIT_SHA", features = ["launcher"] }
 eframe = { version = "0.37", default-features = false, features = ["glow", "default_fonts"] }
 ```
 
 `cdylib` 产出交给 `wasm-bindgen` 的原始 `.wasm`。同一个库还要供其他 Rust 目标链接时，再加上 `rlib`。
 
-在库的 WASM 入口提供 App 构造函数：
+在共用代码中提供 App 构造函数：
 
 ```rust,ignore
-#[cfg(target_arch = "wasm32")]
 #[egui_web_sandbox::wasm_bindgen]
 fn create_app() -> eframe::AppCreator<'static> {
     Box::new(|cc| Ok(Box::new(MyApp::new(cc))))
@@ -56,6 +55,9 @@ fn create_app() -> eframe::AppCreator<'static> {
 
 属性宏接收无参数、同步的工厂函数，导出页面调用的 `start()`。
 该入口使用标准 `#canvas` 和默认的 eframe WebOptions，每个 WASM 模块声明一次。
+原生入口可把同一个 `create_app()` 交给 `eframe::run_native`，应用初始化共用同一条路径。
+沿用项目原生入口的 eframe 特性，例如 Linux 上使用的 `x11` 或 `wayland`。
+平台专属依赖和实现由宿主入口或适配层管理。
 
 安装构建工具和启动命令：
 

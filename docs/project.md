@@ -6,6 +6,8 @@ central policy service. Repository setup skills are explicitly invoked.
 
 - `skills/idea2crate-repo-setup/`: the entry point, invocation metadata, baseline
   asset and license needed to create or update a project's development setup.
+- `skills/idea2crate-egui-web-sandbox/`: guidance for sharing application
+  initialization and handling Sandbox compatibility exceptions.
 - `crates/egui-web-sandbox/`: reusable egui observations, browser clipboard/reset
   environment, optional Web launcher and CLI, browser clients and regression tests.
 - `crates/egui-web-sandbox-macros/`: the launcher attribute that exports the browser
@@ -42,10 +44,10 @@ Keep the browser library independent of consumers, including their manifests,
 native services and build commands. Dependents select their own compatible egui
 source. Do not rely on a consuming workspace to enable required Cargo features.
 
-For a new or changed skill, also run your agent's bundled skill validator and
-check its behavior against realistic requests: creating a new project, updating
-an existing one without losing rules, and ordinary coding that must not invoke
-the setup skill. Structural validation alone does not prove correct behavior.
+For a new or changed skill, run your agent's bundled skill validator and
+check its guidance against realistic requests for that skill. For Sandbox
+integration, cover a shared factory and a compatibility exception. For repository
+setup, cover a new project, an existing project, and ordinary coding.
 Documentation and template edits do not need new unit tests.
 
 Use a short `codex/` branch and a PR. A human explicitly approves the final

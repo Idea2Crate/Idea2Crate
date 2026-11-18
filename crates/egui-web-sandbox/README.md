@@ -47,14 +47,14 @@ ZIP tools, for example `unzip -l target/my_app.egsx`. See the
 The WASM library supplies the ordinary eframe App factory:
 
 ```rust,ignore
-#[cfg(target_arch = "wasm32")]
 #[egui_web_sandbox::wasm_bindgen]
 fn create_app() -> eframe::AppCreator<'static> {
     Box::new(|cc| Ok(Box::new(MyApp::new(cc))))
 }
 ```
 
-The attribute exports `start()` for the included browser page. Enable `launcher`
+The attribute exports `start()` on WASM and keeps the same factory callable
+by a native eframe host. Enable `launcher`
 for the eframe-based startup path. It owns WebRunner and the
 bridge while passing the App directly to eframe, preserving lifecycle hooks.
 The optional `cli` feature builds the sandbox command, which serves the Canvas

@@ -14,6 +14,7 @@ when needed; this repository does not synchronize or enforce project rules.
 | --- | --- |
 | [egui-web-sandbox](crates/egui-web-sandbox/) | Launch an egui App in a browser, observe controls and test real input in isolated instances |
 | [Web app example](examples/web-app/) | Build an egui App for WASM and serve it with the sandbox command |
+| [idea2crate-egui-web-sandbox](skills/idea2crate-egui-web-sandbox/SKILL.md) | Integrate the Sandbox while sharing application initialization across native and browser hosts |
 | [idea2crate-repo-setup](skills/idea2crate-repo-setup/SKILL.md) | Create a project or update its development rules when explicitly invoked |
 
 The Rust crate is available as a Git dependency pinned to a reviewed commit;

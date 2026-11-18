@@ -3,7 +3,7 @@ use proc_macro_crate::{FoundCrate, crate_name};
 use quote::{format_ident, quote};
 use syn::{ItemFn, parse_macro_input};
 
-/// Export the standard browser `start()` from a synchronous AppCreator factory.
+/// Keep the AppCreator factory available on every target and export `start()` on WASM.
 #[proc_macro_attribute]
 pub fn wasm_bindgen(args: TokenStream, input: TokenStream) -> TokenStream {
     let factory = parse_macro_input!(input as ItemFn);
@@ -35,6 +35,7 @@ pub fn wasm_bindgen(args: TokenStream, input: TokenStream) -> TokenStream {
     quote! {
         #factory
 
+        #[cfg(target_arch = "wasm32")]
         #[doc(hidden)]
         #[::#sandbox::__private::wasm_bindgen::prelude::wasm_bindgen(
             js_name = start,
