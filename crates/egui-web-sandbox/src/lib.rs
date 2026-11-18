@@ -7,18 +7,8 @@ pub mod desktop;
 mod observe;
 pub use observe::{Control, ControlRole, Snapshot, WindowSnapshot};
 pub const PROTOCOL_VERSION: u32 = 1;
-#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-pub mod server;
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
 pub mod web;
-
-/// Embed the website produced by `egui_web_sandbox_build::build()` in build.rs.
-#[macro_export]
-macro_rules! include_app {
-    () => {
-        include!(concat!(env!("OUT_DIR"), "/egui_web_sandbox.rs"))
-    };
-}
 
 /// One observer and in-memory test environment per egui context.
 #[derive(Clone)]

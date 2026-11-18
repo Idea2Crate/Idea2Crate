@@ -11,7 +11,7 @@ Sandbox 在内存中生成浏览器绑定并提供本地 Web 服务，启动时�
 
 ```sh
 cargo build --locked -p egui-web-app --lib --target wasm32-unknown-unknown
-cargo build --locked -p egui-web-sandbox-build --features cli --bin egui-web-sandbox
+cargo build --locked -p egui-web-sandbox --features cli --bin egui-web-sandbox
 ./target/debug/egui-web-sandbox target/wasm32-unknown-unknown/debug/egui_web_app.wasm
 ```
 
@@ -57,7 +57,7 @@ pub async fn start() -> Result<egui_web_sandbox::web::WebApp, wasm_bindgen::JsVa
 安装一次启动命令：
 
 ```sh
-cargo install --locked --git https://github.com/Idea2Crate/Idea2Crate --rev REVIEWED_COMMIT_SHA --features cli egui-web-sandbox-build
+cargo install --locked --git https://github.com/Idea2Crate/Idea2Crate --rev REVIEWED_COMMIT_SHA --features cli egui-web-sandbox
 ```
 
 在应用目录自行编译后，传入 Cargo 生成的原始 WASM 库：
@@ -89,9 +89,6 @@ egui-web-sandbox target/wasm32-unknown-unknown/debug/my_app.wasm 8000 --bind ::1
 - egui/eframe 必须保持兼容版本和来源。本库默认使用 crates.io 0.37；
   项目使用 Git 补丁时，在自己的 workspace 中统一 `[patch.crates-io]`。
 - 原生专属依赖按 target 限制，Web 入口提供浏览器实现或生成的测试数据。
-
-如果要交付一个无需 Cargo 和源码、双击或运行就能自己提供网页的可执行文件，
-使用[嵌入式示例](../../../examples/embedded-web-app/)的构建和服务器 API。
 
 | 应用内容 | 项目负责 |
 | --- | --- |
@@ -127,8 +124,8 @@ Canvas 不应有 CSS 变换或边框。`ready` 表示 egui 已产生输出，业
 
 ## 5. 已有 Web 宿主与重置
 
-已有页面可以继续使用 `web::launch(AppCreator)` 或自有 Canvas 的
-`web::launch_on(canvas, options, AppCreator)`，无需启用原生 `server`。
+已有页面可以使用 `web::launch(AppCreator)` 或自有 Canvas 的
+`web::launch_on(canvas, options, AppCreator)`。
 已有 WebRunner 则只启用 `web`，自行安装并保留 `Sandbox` 与 `AgentBridge`。
 
 启动器将 App 直接交给 eframe，保留 `logic`、输入处理、绘制和其他生命周期方法。

@@ -3,8 +3,8 @@ import {mkdir} from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {SandboxPage} from '../browser/client.mjs';
 
-const base = process.env.SANDBOX_URL ?? 'http://127.0.0.1:8765';
-const path = process.env.SANDBOX_DEMO_PATH ?? '/sandbox/';
+const base = process.env.SANDBOX_URL;
+assert.ok(base, 'Run npm test to start the workbench');
 const browser = await chromium.launch({headless: true,
   ...(process.env.CHROMIUM_EXECUTABLE ? {executablePath: process.env.CHROMIUM_EXECUTABLE} : {})});
 const errors = [];
@@ -17,7 +17,7 @@ async function open(scale = 1, query = '') {
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(String(error)));
   page.on('console', message => { if (message.type() === 'error' && !message.text().includes('404')) errors.push(message.text()); });
-  await page.goto(`${base}${path}${query}`);
+  await page.goto(new URL(query, base).href);
   await page.locator('#status').waitFor({state: 'detached'});
   const app = new SandboxPage(page);
   await app.ready();

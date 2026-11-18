@@ -1,16 +1,14 @@
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
-import {mkdtemp, readFile, realpath, rm} from 'node:fs/promises';
-import {createServer} from 'node:http';
+import {mkdtemp, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
-import {join, resolve, sep} from 'node:path';
+import {join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
-const directory = await realpath(join(root, '.build/site'));
-const empty = await mkdtemp(join(tmpdir(), 'egui-embedded-'));
-const target = process.env.CARGO_TARGET_DIR ?? join(root, 'target');
+const empty = await mkdtemp(join(tmpdir(), 'egui-sandbox-test-'));
+const target = resolve(root, process.env.CARGO_TARGET_DIR ?? 'target');
 const servers = [];
 
 function startServer(executable, args, options) {
@@ -32,64 +30,39 @@ function startServer(executable, args, options) {
   });
 }
 
-// Only test fixtures use a disk server.
-const fixtures = createServer(async (request, response) => {
-  response.setHeader('Access-Control-Allow-Origin', '*');
-  try {
-    let path = resolve(directory, `.${new URL(request.url, 'http://localhost').pathname}`);
-    if (path.endsWith(`${sep}sandbox`)) path = join(path, 'index.html');
-    path = await realpath(path);
-    if (!path.startsWith(directory + sep)) throw Error('outside fixture directory');
-    const bytes = await readFile(path);
-    response.setHeader('Content-Type', path.endsWith('.wasm') ? 'application/wasm' : path.endsWith('.html') ? 'text/html' : 'text/javascript');
-    response.end(bytes);
-  } catch {
-    response.writeHead(404).end();
-  }
-});
-
 try {
-  // Both launch paths must work without Cargo, Python or a source directory.
-  const embedded = process.env.SANDBOX_SERVER ?? join(target, 'debug/egui-embedded-web-app');
   const command = join(target, 'debug/egui-web-sandbox');
-  const wasm = join(target, 'wasm32-unknown-unknown/debug/egui_web_app.wasm');
-  const failure = join(target, 'wasm32-unknown-unknown/debug/examples/startup_failure.wasm');
-  const isolated = {cwd: empty, env: {...process.env, PATH: ''}};
-  // A nonexistent temp directory catches any attempt to use the old on-disk generation path.
+  const wasm = join(target, 'wasm32-unknown-unknown/debug');
+  // The command only needs its WASM input and runs without Cargo or a temporary directory.
   const noTemp = join(empty, 'no-temp-directory');
-  const cliOptions = {...isolated, env: {...isolated.env, TMPDIR: noTemp, TEMP: noTemp, TMP: noTemp}};
-  const [url, cliUrl, cliFailureUrl] = await Promise.all([
-    startServer(embedded, ['0', '-b', 'localhost'], isolated),
-    startServer(command, [wasm, '--port=0', '--bind', '::1'], cliOptions),
-    startServer(command, [failure], cliOptions),
+  const options = {cwd: empty, env: {...process.env, PATH: '', TMPDIR: noTemp, TEMP: noTemp, TMP: noTemp}};
+  const [workbenchUrl, notesUrl, failureUrl] = await Promise.all([
+    startServer(command, [join(wasm, 'examples/basic.wasm'), '0', '-b', 'localhost'], options),
+    startServer(command, [join(wasm, 'egui_web_app.wasm'), '--port=0', '--bind', '::1'], options),
+    startServer(command, [join(wasm, 'examples/startup_failure.wasm')], options),
   ]);
-  assert.equal(new URL(url).hostname, '127.0.0.1');
-  assert.equal(new URL(cliUrl).hostname, '[::1]');
-  for (const origin of [url, cliUrl]) {
+  assert.equal(new URL(workbenchUrl).hostname, '127.0.0.1');
+  assert.equal(new URL(notesUrl).hostname, '[::1]');
+  for (const origin of [workbenchUrl, notesUrl]) {
     for (const name of ['Cargo.toml', '../Cargo.toml', '.env', 'src/lib.rs']) {
       assert.equal((await fetch(new URL(name, origin))).status, 404);
     }
     assert.equal((await fetch(new URL('app_bg.wasm', origin), {method: 'HEAD'})).headers.get('content-type'), 'application/wasm');
     assert.equal((await fetch(origin, {method: 'POST'})).status, 405);
   }
-  fixtures.listen(0, '127.0.0.1');
-  await once(fixtures, 'listening');
   const env = {
     ...process.env,
-    SANDBOX_URL: `http://127.0.0.1:${fixtures.address().port}`,
-    LAUNCHER_URL: url,
-    CLI_URL: cliUrl,
-    CLI_FAILURE_URL: cliFailureUrl,
+    SANDBOX_URL: workbenchUrl,
+    LAUNCHER_URL: notesUrl,
+    CLI_FAILURE_URL: failureUrl,
   };
   for (const script of ['parallel.mjs', 'launcher.mjs']) {
     const child = spawn(process.execPath, [fileURLToPath(new URL(script, import.meta.url))], {env, stdio: 'inherit'});
     const [code] = await once(child, 'exit');
     assert.equal(code, 0, `${script} failed`);
   }
-  console.log('PASS: IPv4 and IPv6 browser access, empty PATH/cwd, embedded assets and HTTP boundaries');
+  console.log('PASS: IPv4 and IPv6 browser access, in-memory assets, and HTTP boundaries');
 } finally {
-  fixtures.closeAllConnections();
-  fixtures.close();
   for (const {app} of servers) app.kill();
   await Promise.all(servers.map(({closed}) => closed));
   await rm(empty, {recursive: true, force: true});

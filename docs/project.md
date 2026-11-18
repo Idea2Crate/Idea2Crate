@@ -7,11 +7,8 @@ central policy service. Repository setup skills are explicitly invoked.
 - `skills/idea2crate-repo-setup/`: the entry point, invocation metadata, baseline
   asset and license needed to create or update a project's development setup.
 - `crates/egui-web-sandbox/`: reusable egui observations, browser clipboard/reset
-  environment, optional Web launcher, browser clients and regression tests.
-- `crates/egui-web-sandbox-build/`: binding generation for the sandbox command
-  and the build-script API that builds and embeds Web resources.
+  environment, optional Web launcher and CLI, browser clients and regression tests.
 - `examples/web-app/`: a WASM library and App factory served by the sandbox command.
-- `examples/embedded-web-app/`: the same App served by a self-contained executable.
 - `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`: the Rust workspace and its
   reproducible development toolchain; this workspace has no application dependency.
 - `AGENTS.md`: this repository's own instructions, independently maintained.
@@ -33,10 +30,10 @@ development. Install the local hooks with
 CI runs these checks in one Ubuntu `verify` job, which is required for merging.
 The credential guard itself uses Python 3.9+ and the standard library.
 
-Rust hooks run formatting, WASM Clippy and native server/build-helper Clippy.
-CI builds the sandbox command, self-contained executable and browser fixtures, then runs browser
-interaction, lifecycle and empty-PATH/cwd server regressions. The launcher passes App directly to eframe;
-do not replace it with a proxy that silently drops application lifecycle hooks.
+Rust hooks run formatting, WASM Clippy and native CLI Clippy.
+CI builds the sandbox command and WASM fixtures, then uses the command to test real
+browser interaction, lifecycle and startup without Cargo or a temporary directory.
+The launcher passes the App directly to eframe to preserve its lifecycle hooks.
 Build and run commands live in the crate's [quick start](../crates/egui-web-sandbox/docs/quick-start.md).
 Keep the browser library independent of consumers, including their manifests,
 native services and build commands. Dependents select their own compatible egui

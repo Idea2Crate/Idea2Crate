@@ -38,12 +38,9 @@ sandbox command:
 egui-web-sandbox target/wasm32-unknown-unknown/debug/my_app.wasm
 ```
 
-Open the URL printed by the command. The command generates browser bindings
-and serves the app. See the [complete example](../../examples/web-app/) for build commands.
-
-For a standalone binary that runs without Cargo or source files, see the
-[embedded server example](../../examples/embedded-web-app/). Both modes bind an
-unused loopback port and let the caller open the browser.
+Open the loopback URL printed by the command. The CLI generates and serves
+browser bindings from memory. See the [complete example](../../examples/web-app/)
+for build commands.
 
 The WASM library supplies the ordinary eframe App factory:
 
@@ -56,8 +53,8 @@ pub async fn start() -> Result<egui_web_sandbox::web::WebApp, JsValue> {
 
 Enable `launcher` for the eframe-based startup path. It owns WebRunner and the
 bridge while passing the App directly to eframe, preserving lifecycle hooks.
-The native `server` feature includes the canvas, loading/error shell and browser
-client. The build helper generates bindings during embedding or command startup.
+The optional `cli` feature builds the sandbox command, which serves the Canvas
+page, loading and error UI, and browser client.
 Keep the returned WebApp alive until unmount; the provided `mount()` helper does
 this and releases it when stopped or when the page finally leaves. `launch_on`
 accepts a custom canvas and WebOptions. See the [quick start](docs/quick-start.md)
@@ -145,9 +142,9 @@ The [entry demo](../../examples/web-app/) runs with the sandbox command. Reposit
 builds the workbench and a failing-constructor fixture; its workflow lists the
 fixture build commands. In `crates/egui-web-sandbox/browser-tests/`, run
 `npm ci --ignore-scripts`, `npx playwright install chromium --only-shell`, then
-`npm test`. The harness starts its own fixtures and the compiled server, tests
-normal input and parallel contexts at DPR 1/2, startup failures and cleanup,
-and verifies that the embedded executable runs with an empty PATH and working directory.
+`npm test`. The harness serves all WASM fixtures through the compiled CLI and
+tests input, parallel contexts at DPR 1/2, startup failures, cleanup and JS module
+imports. It starts the CLI with an empty PATH and no temporary directory.
 `CARGO_TARGET_DIR` selects a non-default binary directory used by the Cargo build;
 `CHROMIUM_EXECUTABLE` optionally selects an existing headless Chromium binary.
 A consuming application owns its business integration tests.
@@ -165,8 +162,8 @@ does not establish compatibility with every existing egui application.
 外部服务处于操作系统安全沙箱中。
 
 面向应用交互 Demo 和 Agent 并行 UI 回归。`egui-web-sandbox` 命令接收已编译的 WASM
-并提供本地 Web 服务。需要独立成品的项目可在自己的可执行文件中嵌入网页。已有 Web 宿主
-也可只安装观察桥接。业务界面继续使用标准 egui，不登记每个窗口，也不镜像业务状态。
+并提供本地 Web 服务。已有 Web 宿主也可只安装观察桥接。
+业务界面继续使用标准 egui，不登记每个窗口，也不镜像业务状态。
 观察负责控件名称、状态与窗口归属；测试环境负责内存剪贴板及可选重置；虚拟桌面
 仅供特殊原生窗口模拟使用。独立工作台业务代码不导入 sandbox，表单、文本、画布
 和多窗口都走正常 egui 输入。需要先让原生专属服务可在 WASM 中使用测试数据替代。

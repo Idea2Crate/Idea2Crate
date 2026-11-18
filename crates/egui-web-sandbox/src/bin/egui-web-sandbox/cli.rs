@@ -19,7 +19,7 @@ pub struct Options {
 }
 
 impl Options {
-    pub fn parse(allow_wasm: bool) -> Result<Self> {
+    pub fn parse() -> Result<Self> {
         let mut args = env::args_os().skip(1);
         let mut ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
         let mut port = None;
@@ -35,8 +35,7 @@ impl Options {
                         !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit())
                     }) {
                         set_port(&mut port, &arg)?;
-                    } else if allow_wasm
-                        && wasm.is_none()
+                    } else if wasm.is_none()
                         && PathBuf::from(&arg)
                             .extension()
                             .is_some_and(|extension| extension == "wasm")

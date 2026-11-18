@@ -13,7 +13,7 @@ include = ["/src/**", "/docs/**", "/examples/**", "/browser/*.mjs", "/browser/*.
 [features]
 web = ["dep:wasm-bindgen", "dep:js-sys", "dep:web-sys"]
 launcher = ["web", "dep:eframe"]
-server = ["dep:tiny_http"]
+cli = ["dep:tiny_http", "dep:wasm-bindgen-cli-support"]
 
 [dependencies]
 egui = { version = "0.37.0", default-features = false }
@@ -22,6 +22,7 @@ serde_json = "1.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tiny_http = { version = "0.12", optional = true, default-features = false }
+wasm-bindgen-cli-support = { version = "=0.2.130", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = { version = "0.2", optional = true }
@@ -32,6 +33,10 @@ eframe = { version = "0.37.0", optional = true, default-features = false, featur
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-futures = "0.4"
 web-sys = { version = "0.3", features = ["Location", "UrlSearchParams"] }
+
+[[bin]]
+name = "egui-web-sandbox"
+required-features = ["cli"]
 
 [[example]]
 name = "basic"

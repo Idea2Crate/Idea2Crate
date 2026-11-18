@@ -4,7 +4,7 @@ Run from the repository root:
 
 ```sh
 cargo build --locked -p egui-web-app --lib --target wasm32-unknown-unknown
-cargo build --locked -p egui-web-sandbox-build --features cli --bin egui-web-sandbox
+cargo build --locked -p egui-web-sandbox --features cli --bin egui-web-sandbox
 ./target/debug/egui-web-sandbox target/wasm32-unknown-unknown/debug/egui_web_app.wasm
 ```
 
@@ -20,5 +20,4 @@ project's locked dependencies. Native services remain the project's
 responsibility; this example uses only ordinary egui controls.
 
 See the [quick start](../../crates/egui-web-sandbox/docs/quick-start.md) for using
-the command from another project, or the [embedded example](../embedded-web-app/)
-for building a self-contained native executable.
+the command from another project.
