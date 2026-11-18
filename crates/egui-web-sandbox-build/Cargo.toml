@@ -8,10 +8,20 @@ description = "Build and embed an egui sandbox Web app into its native executabl
 repository = "https://github.com/Idea2Crate/Idea2Crate"
 publish = false
 
+[features]
+cli = ["dep:egui-web-sandbox", "dep:tempfile"]
+
+[[bin]]
+name = "egui-web-sandbox"
+path = "src/main.rs"
+required-features = ["cli"]
+
 [dependencies]
 depfile = "0.1.1"
 serde_json = "1.0"
 wasm-bindgen-cli-support = "=0.2.130"
+egui-web-sandbox = { version = "0.1.0", path = "../egui-web-sandbox", features = ["server"], optional = true }
+tempfile = { version = "3", optional = true }
 
 [lints.rust]
 unsafe_code = "forbid"

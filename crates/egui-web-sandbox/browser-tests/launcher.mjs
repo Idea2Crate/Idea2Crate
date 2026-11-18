@@ -5,6 +5,8 @@ import {SandboxPage} from '../browser/client.mjs';
 const origin = process.env.SANDBOX_URL ?? 'http://127.0.0.1:8765';
 const launcher = process.env.LAUNCHER_URL;
 assert.ok(launcher, 'Run npm test to start the embedded app server');
+const cli = process.env.CLI_URL;
+assert.ok(cli, 'Run npm test to start the sandbox command');
 const browser = await chromium.launch({headless: true,
   ...(process.env.CHROMIUM_EXECUTABLE ? {executablePath: process.env.CHROMIUM_EXECUTABLE} : {})});
 const context = await browser.newContext({viewport: {width: 1000, height: 720}});
@@ -68,6 +70,12 @@ try {
   await app.control('TextInput', 'Title').fill('Restarted');
   await app.control('Button', 'Save').click();
   await page.waitForFunction(() => window.eguiSandbox.snapshot().controls.some(c => c.label === 'Saved: Restarted'));
+
+  await page.goto(cli);
+  await app.ready();
+  await app.control('TextInput', 'Title').fill('From the sandbox command');
+  await app.control('Button', 'Save').click();
+  await page.waitForFunction(() => window.eguiSandbox.snapshot().controls.some(c => c.label === 'Saved: From the sandbox command'));
   assert.deepEqual(errors, []);
   console.log('PASS: factory-only launcher, App logic, duplicate startup, page lifecycle, constructor failure, error display and restart');
 } finally {

@@ -1,6 +1,6 @@
 # Quick Start
 
-把 App 构造函数交给 Web 启动器，构建时自动编译并嵌入网页；原生可执行文件运行时直接提供本地 Web 服务。无需复制模板、编写 HTML、安装 wasm-bindgen CLI 或启动 Python 服务器。
+Sandbox 提供 `egui-web-sandbox` 命令，自动编译用户项目的 WASM 库并启动本地 Web 服务。项目侧只需声明 WASM 库，并提供调用 App 构造函数的 Web 入口。
 
 当前支持 egui/eframe 0.37。项目负责让共享 UI 可编译到 WASM，并适配截图、文件系统、全局快捷键等原生能力。
 
@@ -9,26 +9,17 @@
 在 Idea2Crate 仓库根目录：
 
 ```sh
-cargo run --locked -p egui-web-app
+cargo run --locked -p egui-web-sandbox-build --features cli --bin egui-web-sandbox -- examples/web-app/Cargo.toml
 ```
 
 第一次构建需要工具链声明的 `wasm32-unknown-unknown` target。命令打印类似
 `http://127.0.0.1:49152/` 的地址，打开即可操作 Notes 应用。每次运行使用空闲端口，
 可同时启动多个进程；每个 BrowserContext／页面还有独立的 App 和内存剪贴板。
 
-也可以先构建，再单独运行产物：
+命令只监听本机回环地址。Ctrl+C 结束服务。
 
-```sh
-cargo build --locked -p egui-web-app
-./target/debug/egui-web-app
-```
-
-成品内嵌 WASM、JS、页面、客户端和许可声明。运行时不需要 Cargo、Python、源码目录
-或外部资源文件。它只监听本机回环地址，不自动打开浏览器或访问系统剪贴板。
-Ctrl+C 结束服务。
-
-完整源码见 [examples/web-app](../../../examples/web-app/)。这是一份可运行示例，
-接入项目不需要复制其目录。
+示例只有 Cargo 配置、普通 egui 界面和 WASM 入口，没有 `main.rs` 或 `build.rs`。
+见 [examples/web-app](../../../examples/web-app/)。
 
 ## 2. 在自己的项目接入
 
@@ -39,25 +30,11 @@ Ctrl+C 结束服务。
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[build-dependencies]
-egui-web-sandbox-build = { version = "0.1.0", git = "https://github.com/Idea2Crate/Idea2Crate", rev = "REVIEWED_COMMIT_SHA" }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-egui-web-sandbox = { version = "0.1.0", git = "https://github.com/Idea2Crate/Idea2Crate", rev = "REVIEWED_COMMIT_SHA", features = ["server"] }
-
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 egui-web-sandbox = { version = "0.1.0", git = "https://github.com/Idea2Crate/Idea2Crate", rev = "REVIEWED_COMMIT_SHA", features = ["launcher"] }
 eframe = { version = "0.37", default-features = false, features = ["glow", "default_fonts"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
-```
-
-在已有 `build.rs` 中调用构建 API：
-
-```rust,ignore
-fn main() {
-    egui_web_sandbox_build::build().expect("build embedded Web app");
-}
 ```
 
 在库的 WASM 入口提供 App 构造函数：
@@ -72,22 +49,18 @@ pub async fn start() -> Result<egui_web_sandbox::web::WebApp, wasm_bindgen::JsVa
 }
 ```
 
-原生入口调用服务器 API：
+安装一次启动命令，再在应用 package 目录运行：
 
-```rust,ignore
-fn main() -> egui_web_sandbox::server::Result<()> {
-    egui_web_sandbox::server::serve(egui_web_sandbox::include_app!())
-}
+```sh
+rustup target add wasm32-unknown-unknown
+cargo install --locked --git https://github.com/Idea2Crate/Idea2Crate --rev REVIEWED_COMMIT_SHA --features cli egui-web-sandbox-build
+egui-web-sandbox
 ```
 
-然后直接 `cargo run`。项目原本已有桌面入口时，可以另加一个 Web 服务 binary，
-原有桌面运行方式由项目保留。构建 API 会将本 package 的 library 编译到 WASM，
-随后生成 JS 绑定并嵌入产物；WASM 子构建不会递归生成另一份网站。
-原生服务 API 只提供这些内嵌资源，不暴露项目目录。
-
-这不是运行时将原生二进制转换成 WASM：同一套 Rust UI 在构建时编译到两个目标。
-首次构建会多进行一次 WASM 编译，后续复用 Cargo 增量缓存。UI 只存在于 WASM 的
-示例中，原生部分只负责 Web 服务。
+从 workspace 根目录运行时，传入成员的 manifest，例如
+`egui-web-sandbox preview/Cargo.toml`。命令按项目的 Cargo.lock 和默认 features 编译
+WASM 库，并复用项目的 Cargo 缓存。原生服务器已经在安装命令时编译好，可以服务多个项目；
+项目本身无需为浏览器模式再构建原生 binary。服务只提供生成的网页和绑定资源。
 
 ## 3. 接入现有项目时的配置
 
@@ -95,25 +68,9 @@ fn main() -> egui_web_sandbox::server::Result<()> {
 - egui/eframe 必须保持兼容版本和来源。本库默认使用 crates.io 0.37；
   项目使用 Git 补丁时，在自己的 workspace 中统一 `[patch.crates-io]`。
 - 原生专属依赖按 target 限制，Web 入口提供浏览器实现或生成的测试数据。
-- 构建 API 默认使用 Web 目标的默认 Cargo features；需要不同组合时显式配置：
 
-```rust,ignore
-egui_web_sandbox_build::Builder::default()
-    .no_default_features()
-    .features(["web-demo"])
-    .build()
-    .expect("build embedded Web app");
-```
-
-构建器需要当前 package 有 cdylib library，沿用 Cargo.lock；生成的网页、嵌入代码及
-嵌套构建产物均写入 Cargo OUT_DIR。
-构建器跟踪 Cargo 记录的源文件、包含的资源和本地共享库，修改后会重新嵌入 WASM。
-项目自己的代码生成器读取的额外输入，仍按 Cargo 的惯例在 build.rs 声明。
-
-服务器默认使用空闲端口。固定端口或集成到项目自身生命周期时，使用
-`server::Server::bind(include_app!(), port)`，通过 `url()` 取得地址，
-调用 `run()` 开始服务。服务阻塞当前线程，线程安排由调用方决定；
-`stop()` 结束请求循环，等待服务线程结束后释放 Server 即关闭监听。
+如果要交付一个无需 Cargo 和源码、双击或运行就能自己提供网页的可执行文件，
+使用[嵌入式示例](../../../examples/embedded-web-app/)的构建和服务器 API。
 
 | 应用内容 | 项目负责 |
 | --- | --- |

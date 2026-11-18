@@ -42,8 +42,57 @@ impl Builder {
         let project = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").ok_or("run from build.rs")?);
         let output = PathBuf::from(env::var_os("OUT_DIR").ok_or("OUT_DIR unavailable")?);
         let manifest = project.join("Cargo.toml");
+        let (wasm, workspace) = self.compile(
+            &manifest,
+            Some(&output.join("wasm-target")),
+            env::var("PROFILE").as_deref() == Ok("release"),
+        )?;
+        track_sources(&wasm, &manifest, &workspace, &output)?;
+        let site = output.join("site");
+        if site.exists() {
+            fs::remove_dir_all(&site)?;
+        }
+        let mut embedded = String::from("&[\n");
+        for (name, path) in generate(&wasm, &site)? {
+            embedded.push_str(&format!(
+                "({name:?}, include_bytes!({:?}) as &'static [u8]),\n",
+                path.to_str().ok_or("non-UTF-8 build path")?
+            ));
+        }
+        embedded.push_str("]\n");
+        fs::write(output.join("egui_web_sandbox.rs"), embedded)?;
+        Ok(())
+    }
+
+    /// Compile the library in this manifest and serve it using a local port.
+    #[cfg(feature = "cli")]
+    pub fn serve(self, manifest: &Path) -> Result<()> {
+        let (wasm, _) = self.compile(manifest, None, false)?;
+        let site = tempfile::tempdir()?;
+        let assets = generate(&wasm, site.path())?
+            .into_iter()
+            .map(|(name, path)| Ok((name, fs::read(path)?)))
+            .collect::<std::io::Result<Vec<_>>>()?;
+        site.close()?;
+        let server = egui_web_sandbox::server::Server::bind_assets(assets, 0)?;
+        println!("{}", server.url());
+        server.run();
+        Ok(())
+    }
+
+    fn compile(
+        self,
+        manifest: &Path,
+        target_dir: Option<&Path>,
+        release: bool,
+    ) -> Result<(PathBuf, PathBuf)> {
+        let manifest = manifest.canonicalize()?;
+        let project = manifest
+            .parent()
+            .ok_or("manifest has no project directory")?;
         let cargo = env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
         let metadata = Command::new(&cargo)
+            .current_dir(project)
             .args([
                 "metadata",
                 "--locked",
@@ -69,11 +118,16 @@ impl Builder {
                     .as_str()
                     .is_some_and(|p| Path::new(p) == manifest)
             })
-            .ok_or("current package missing from Cargo metadata")?;
+            .ok_or("use the Cargo.toml of the package containing the Web library")?;
         let package_id = package["id"].as_str().ok_or("missing Cargo package id")?;
+        let workspace = PathBuf::from(
+            metadata["workspace_root"]
+                .as_str()
+                .ok_or("missing Cargo workspace")?,
+        );
         let mut command = Command::new(&cargo);
         command
-            .current_dir(&project)
+            .current_dir(project)
             .args([
                 "build",
                 "--locked",
@@ -84,14 +138,18 @@ impl Builder {
                 "--manifest-path",
             ])
             .arg(&manifest)
-            .arg("--target-dir")
-            .arg(output.join("wasm-target"))
-            // Let Cargo recompute flags for the WASM target, rather than inheriting native flags.
-            .env_remove("CARGO_ENCODED_RUSTFLAGS")
-            .env_remove("CARGO_MAKEFLAGS")
+            .args(["--package", package_id])
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
-        if env::var("PROFILE").as_deref() == Ok("release") {
+        if let Some(target_dir) = target_dir {
+            // A nested build uses its own target cache and WASM-specific flags.
+            command
+                .arg("--target-dir")
+                .arg(target_dir)
+                .env_remove("CARGO_ENCODED_RUSTFLAGS")
+                .env_remove("CARGO_MAKEFLAGS");
+        }
+        if release {
             command.arg("--release");
         }
         if self.no_default_features {
@@ -126,71 +184,63 @@ impl Builder {
             return Err("WASM build failed; install wasm32-unknown-unknown and adapt native-only services for Web".into());
         }
         let wasm = artifact.ok_or("Web entry needs [lib] crate-type = [\"cdylib\", \"rlib\"] and an exported async start()")?;
-        // Cargo's depfile includes the actual transitive local sources and included
-        // assets. Follow it so changing a shared App library also refreshes WASM.
-        let dependencies = fs::read_to_string(wasm.with_extension("d"))?;
-        // The output filename is irrelevant; normalize its rule target so a
-        // Windows drive colon is not mistaken for the dependency separator.
-        let (_, dependencies) = dependencies
-            .split_once(": ")
-            .ok_or("invalid Cargo depfile rule")?;
-        let dependencies = format!("web: {dependencies}");
-        let dependencies = depfile::parse(&dependencies)
-            .map_err(|position| format!("invalid Cargo depfile at byte {position}"))?;
-        let workspace = PathBuf::from(
-            metadata["workspace_root"]
-                .as_str()
-                .ok_or("missing Cargo workspace")?,
-        );
-        let mut inputs = BTreeSet::from([
-            manifest.clone(),
-            workspace.join("Cargo.toml"),
-            workspace.join("Cargo.lock"),
-        ]);
-        for (_, dependencies) in dependencies.iter() {
-            for path in dependencies {
-                let path = project.join(path.as_ref());
-                if path.starts_with(&output) {
-                    continue;
-                }
-                if let Some(root) = path
-                    .ancestors()
-                    .find(|path| path.join("Cargo.toml").is_file())
-                {
-                    inputs.insert(root.join("Cargo.toml"));
-                }
-                inputs.insert(path);
-            }
-        }
-        for input in inputs {
-            println!("cargo:rerun-if-changed={}", input.display());
-        }
-        let site = output.join("site");
-        if site.exists() {
-            fs::remove_dir_all(&site)?;
-        }
-        fs::create_dir_all(&site)?;
-        wasm_bindgen_cli_support::Bindgen::new()
-            .input_path(wasm)
-            .web(true)?
-            .omit_default_module_path(false)
-            .typescript(false)
-            .out_name("app")
-            .generate(&site)?;
-        let mut files = Vec::new();
-        collect(&site, &site, &mut files)?;
-        files.sort();
-        let mut embedded = String::from("&[\n");
-        for (name, path) in files {
-            embedded.push_str(&format!(
-                "({name:?}, include_bytes!({:?}) as &'static [u8]),\n",
-                path.to_str().ok_or("non-UTF-8 build path")?
-            ));
-        }
-        embedded.push_str("]\n");
-        fs::write(output.join("egui_web_sandbox.rs"), embedded)?;
-        Ok(())
+        Ok((wasm, workspace))
     }
+}
+
+fn track_sources(wasm: &Path, manifest: &Path, workspace: &Path, output: &Path) -> Result<()> {
+    // Follow the transitive local sources and included assets in Cargo's depfile.
+    let dependencies = fs::read_to_string(wasm.with_extension("d"))?;
+    // The output filename is irrelevant; normalize its rule target so a
+    // Windows drive colon is not mistaken for the dependency separator.
+    let (_, dependencies) = dependencies
+        .split_once(": ")
+        .ok_or("invalid Cargo depfile rule")?;
+    let dependencies = format!("web: {dependencies}");
+    let dependencies = depfile::parse(&dependencies)
+        .map_err(|position| format!("invalid Cargo depfile at byte {position}"))?;
+    let project = manifest
+        .parent()
+        .ok_or("manifest has no project directory")?;
+    let mut inputs = BTreeSet::from([
+        manifest.to_path_buf(),
+        workspace.join("Cargo.toml"),
+        workspace.join("Cargo.lock"),
+    ]);
+    for (_, dependencies) in dependencies.iter() {
+        for path in dependencies {
+            let path = project.join(path.as_ref());
+            if path.starts_with(output) {
+                continue;
+            }
+            if let Some(root) = path
+                .ancestors()
+                .find(|path| path.join("Cargo.toml").is_file())
+            {
+                inputs.insert(root.join("Cargo.toml"));
+            }
+            inputs.insert(path);
+        }
+    }
+    for input in inputs {
+        println!("cargo:rerun-if-changed={}", input.display());
+    }
+    Ok(())
+}
+
+fn generate(wasm: &Path, site: &Path) -> Result<Vec<(String, PathBuf)>> {
+    fs::create_dir_all(site)?;
+    wasm_bindgen_cli_support::Bindgen::new()
+        .input_path(wasm)
+        .web(true)?
+        .omit_default_module_path(false)
+        .typescript(false)
+        .out_name("app")
+        .generate(site)?;
+    let mut files = Vec::new();
+    collect(site, site, &mut files)?;
+    files.sort();
+    Ok(files)
 }
 
 fn collect(root: &Path, directory: &Path, files: &mut Vec<(String, PathBuf)>) -> Result<()> {

@@ -1,7 +1,11 @@
 # egui-web-sandbox-build
 
-Build-script API for embedding an egui Web application in a native executable.
-Paired with the `server` feature of `egui-web-sandbox`.
+The `cli` feature provides the `egui-web-sandbox` command. Run it in the package
+directory or pass its `Cargo.toml`. It builds the package's WASM library and
+prints a loopback URL. See the [quick start](../egui-web-sandbox/docs/quick-start.md).
+
+To build your own standalone executable instead, pair the build-script API with
+the `server` feature of `egui-web-sandbox`.
 
 ```rust,ignore
 fn main() {
@@ -26,4 +30,4 @@ build-only dependency does not become part of the executable. It currently uses
 wasm-bindgen 0.2.130; mismatched artifacts are rejected by wasm-bindgen.
 
 See [quick start](../egui-web-sandbox/docs/quick-start.md) and the complete
-[example](../../examples/web-app/). Not published to crates.io.
+[embedded example](../../examples/embedded-web-app/). Not published to crates.io.

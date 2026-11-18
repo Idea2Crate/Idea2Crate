@@ -29,24 +29,20 @@ The design has three responsibilities, within one crate:
 3. **Optional virtual desktop:** translate custom native window commands only when
    egui's built-in windows/embedded viewports cannot represent the application's needs.
 
-## Run a self-contained Web server
+## Serve your app
 
 The [complete example](../../examples/web-app/) starts with one command:
 
 ```sh
-cargo run --locked -p egui-web-app
+cargo run --locked -p egui-web-sandbox-build --features cli --bin egui-web-sandbox -- examples/web-app/Cargo.toml
 ```
 
-Open the URL printed by the executable. Its native entry calls:
+Open the URL printed by the command. The command builds the project's WASM
+library and provides the native server. The project supplies its Web entry and App.
 
-```rust,ignore
-egui_web_sandbox::server::serve(egui_web_sandbox::include_app!())
-```
-
-In build.rs, `egui_web_sandbox_build::build()` automatically compiles the package's
-WASM library, generates its bindings and embeds the result. The finished binary
-needs neither Cargo nor source files, Python, a binding CLI or an external HTTP
-server. It binds an unused loopback port without opening a browser.
+For a standalone binary that runs without Cargo or source files, see the
+[embedded server example](../../examples/embedded-web-app/). Both modes bind an
+unused loopback port and let the caller open the browser.
 
 The WASM library supplies the ordinary eframe App factory:
 
@@ -144,14 +140,14 @@ embedded viewport inspector. `examples/basic/workbench.rs` has **no sandbox impo
 Only `examples/basic.rs`, the browser entry/outer reset adapter, knows about the host.
 `?observe` runs the same app without application reset support.
 
-The normal entry demo is `cargo run --locked -p egui-web-app`. Repository CI also
+The [entry demo](../../examples/web-app/) runs with the sandbox command. Repository CI also
 builds the workbench and a failing-constructor fixture; its workflow lists the
 fixture build commands. In `crates/egui-web-sandbox/browser-tests/`, run
 `npm ci --ignore-scripts`, `npx playwright install chromium --only-shell`, then
 `npm test`. The harness starts its own fixtures and the compiled server, tests
 normal input and parallel contexts at DPR 1/2, startup failures and cleanup,
-and verifies that the executable runs with an empty PATH and working directory.
-`SANDBOX_SERVER` selects the compiled executable outside `target/debug`;
+and verifies that the embedded executable runs with an empty PATH and working directory.
+`CARGO_TARGET_DIR` selects a non-default binary directory used by the Cargo build;
 `CHROMIUM_EXECUTABLE` optionally selects an existing headless Chromium binary.
 A consuming application owns its business integration tests.
 
@@ -167,8 +163,8 @@ does not establish compatibility with every existing egui application.
 暂未发布到 crates.io。浏览器上下文隔离浏览器状态，不代表构建命令、生成代码或
 外部服务处于操作系统安全沙箱中。
 
-面向应用交互 Demo 和 Agent 并行 UI 回归。构建 API 自动编译并内嵌网页，原生入口
-调用服务器 API 后即可提供本地 Web 服务，成品无需开发工具或源码。已有 Web 宿主
+面向应用交互 Demo 和 Agent 并行 UI 回归。`egui-web-sandbox` 命令自动编译 WASM
+并提供本地 Web 服务。需要独立成品的项目可在自己的可执行文件中嵌入网页。已有 Web 宿主
 也可只安装观察桥接。业务界面继续使用标准 egui，不登记每个窗口，也不镜像业务状态。
 观察负责控件名称、状态与窗口归属；测试环境负责内存剪贴板及可选重置；虚拟桌面
 仅供特殊原生窗口模拟使用。独立工作台业务代码不导入 sandbox，表单、文本、画布

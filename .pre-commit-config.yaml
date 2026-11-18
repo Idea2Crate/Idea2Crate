@@ -38,13 +38,13 @@ repos:
         always_run: true
       - id: rust-lint
         name: WASM library and examples Clippy
-        entry: cargo clippy --locked --workspace --exclude egui-web-sandbox-build --all-targets --all-features --target wasm32-unknown-unknown -- -D warnings
+        entry: cargo clippy --locked --workspace --exclude egui-web-sandbox-build --lib --examples --all-features --target wasm32-unknown-unknown -- -D warnings
         language: system
         pass_filenames: false
         always_run: true
       - id: rust-native-lint
         name: Native server and build helper Clippy
-        entry: cargo clippy --locked -p egui-web-sandbox -p egui-web-sandbox-build --lib --all-features -- -D warnings
+        entry: cargo clippy --locked -p egui-web-sandbox -p egui-web-sandbox-build --lib --bins --all-features -- -D warnings
         language: system
         pass_filenames: false
         always_run: true
