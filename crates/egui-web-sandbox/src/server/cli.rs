@@ -15,15 +15,15 @@ pub const LISTEN_HELP: &str = "\
 pub struct Options {
     pub address: SocketAddr,
     pub help: bool,
-    pub manifest: Option<PathBuf>,
+    pub wasm: Option<PathBuf>,
 }
 
 impl Options {
-    pub fn parse(allow_manifest: bool) -> Result<Self> {
+    pub fn parse(allow_wasm: bool) -> Result<Self> {
         let mut args = env::args_os().skip(1);
         let mut ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
         let mut port = None;
-        let mut manifest = None;
+        let mut wasm = None;
         let mut help = false;
         while let Some(arg) = args.next() {
             let (flag, value) = match arg.to_str() {
@@ -35,13 +35,13 @@ impl Options {
                         !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit())
                     }) {
                         set_port(&mut port, &arg)?;
-                    } else if allow_manifest
-                        && manifest.is_none()
+                    } else if allow_wasm
+                        && wasm.is_none()
                         && PathBuf::from(&arg)
-                            .file_name()
-                            .is_some_and(|name| name == "Cargo.toml")
+                            .extension()
+                            .is_some_and(|extension| extension == "wasm")
                     {
-                        manifest = Some(arg.into());
+                        wasm = Some(arg.into());
                     } else {
                         return Err(format!("unexpected argument {arg:?}").into());
                     }
@@ -76,7 +76,7 @@ impl Options {
         Ok(Self {
             address: SocketAddr::new(ip, port.unwrap_or(0)),
             help,
-            manifest,
+            wasm,
         })
     }
 }

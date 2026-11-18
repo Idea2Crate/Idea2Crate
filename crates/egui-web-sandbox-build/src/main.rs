@@ -1,5 +1,7 @@
 use egui_web_sandbox::server::cli::{LISTEN_HELP, Options};
-use egui_web_sandbox_build::{Builder, Result};
+use egui_web_sandbox_build::{Result, serve_wasm};
+
+const USAGE: &str = "Usage: egui-web-sandbox <app.wasm> [PORT] [OPTIONS]";
 
 fn main() {
     if let Err(error) = run() {
@@ -12,10 +14,10 @@ fn run() -> Result<()> {
     let options = Options::parse(true)?;
     if options.help {
         println!(
-            "Usage: egui-web-sandbox [path/to/Cargo.toml] [PORT] [OPTIONS]\n\nBuild and serve the package's WASM library.\n\n{LISTEN_HELP}"
+            "{USAGE}\n\nServe an app compiled for wasm32-unknown-unknown with wasm-bindgen.\n\n{LISTEN_HELP}"
         );
         return Ok(());
     }
-    let manifest = options.manifest.unwrap_or_else(|| "Cargo.toml".into());
-    Builder::default().serve_at(&manifest, options.address)
+    let wasm = options.wasm.ok_or(USAGE)?;
+    serve_wasm(&wasm, options.address)
 }

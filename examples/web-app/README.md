@@ -3,11 +3,13 @@
 Run from the repository root:
 
 ```sh
-cargo run --locked -p egui-web-sandbox-build --features cli --bin egui-web-sandbox -- examples/web-app/Cargo.toml
+cargo build --locked -p egui-web-app --lib --target wasm32-unknown-unknown
+cargo build --locked -p egui-web-sandbox-build --features cli --bin egui-web-sandbox
+./target/debug/egui-web-sandbox target/wasm32-unknown-unknown/debug/egui_web_app.wasm
 ```
 
-Open the loopback URL printed by the command. The command supplies the server
-and HTML and compiles this package's library for `wasm32-unknown-unknown`.
+Open the loopback URL printed by the command. It takes the compiled WASM file,
+generates its browser bindings and serves the app with the supplied HTML.
 
 - `src/app.rs` is an ordinary eframe App with UI and logic hooks.
 - `src/lib.rs` supplies its constructor to the Web launcher.

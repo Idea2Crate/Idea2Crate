@@ -44,7 +44,7 @@ impl Builder {
         let manifest = project.join("Cargo.toml");
         let (wasm, workspace) = self.compile(
             &manifest,
-            Some(&output.join("wasm-target")),
+            &output.join("wasm-target"),
             env::var("PROFILE").as_deref() == Ok("release"),
         )?;
         track_sources(&wasm, &manifest, &workspace, &output)?;
@@ -64,35 +64,10 @@ impl Builder {
         Ok(())
     }
 
-    /// Compile the library in this manifest and serve it using a local port.
-    #[cfg(feature = "cli")]
-    pub fn serve(self, manifest: &Path) -> Result<()> {
-        self.serve_at(
-            manifest,
-            std::net::SocketAddr::from((std::net::Ipv4Addr::LOCALHOST, 0)),
-        )
-    }
-
-    /// Compile the Web library and serve it at the given address and port.
-    #[cfg(feature = "cli")]
-    pub fn serve_at(self, manifest: &Path, address: std::net::SocketAddr) -> Result<()> {
-        let (wasm, _) = self.compile(manifest, None, false)?;
-        let site = tempfile::tempdir()?;
-        let assets = generate(&wasm, site.path())?
-            .into_iter()
-            .map(|(name, path)| Ok((name, fs::read(path)?)))
-            .collect::<std::io::Result<Vec<_>>>()?;
-        site.close()?;
-        let server = egui_web_sandbox::server::Server::bind_assets_at(assets, address)?;
-        println!("{}", server.url());
-        server.run();
-        Ok(())
-    }
-
     fn compile(
         self,
         manifest: &Path,
-        target_dir: Option<&Path>,
+        target_dir: &Path,
         release: bool,
     ) -> Result<(PathBuf, PathBuf)> {
         let manifest = manifest.canonicalize()?;
@@ -138,6 +113,7 @@ impl Builder {
             .current_dir(project)
             .args([
                 "build",
+                "--locked",
                 "--lib",
                 "--target",
                 "wasm32-unknown-unknown",
@@ -146,18 +122,13 @@ impl Builder {
             ])
             .arg(&manifest)
             .args(["--package", package_id])
+            .arg("--target-dir")
+            .arg(target_dir)
+            // A separate WASM build reuses the enclosing lockfile and computes its own flags.
+            .env_remove("CARGO_ENCODED_RUSTFLAGS")
+            .env_remove("CARGO_MAKEFLAGS")
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
-        if let Some(target_dir) = target_dir {
-            // The enclosing Cargo build owns the lockfile. Use a separate target
-            // cache and let Cargo recompute flags for WASM.
-            command
-                .arg("--locked")
-                .arg("--target-dir")
-                .arg(target_dir)
-                .env_remove("CARGO_ENCODED_RUSTFLAGS")
-                .env_remove("CARGO_MAKEFLAGS");
-        }
         if release {
             command.arg("--release");
         }
@@ -195,6 +166,21 @@ impl Builder {
         let wasm = artifact.ok_or("Web entry needs [lib] crate-type = [\"cdylib\", \"rlib\"] and an exported async start()")?;
         Ok((wasm, workspace))
     }
+}
+
+/// Generate browser bindings and serve a precompiled wasm-bindgen artifact.
+#[cfg(feature = "cli")]
+pub fn serve_wasm(wasm: &Path, address: std::net::SocketAddr) -> Result<()> {
+    let site = tempfile::tempdir()?;
+    let assets = generate(wasm, site.path())?
+        .into_iter()
+        .map(|(name, path)| Ok((name, fs::read(path)?)))
+        .collect::<std::io::Result<Vec<_>>>()?;
+    site.close()?;
+    let server = egui_web_sandbox::server::Server::bind_assets_at(assets, address)?;
+    println!("{}", server.url());
+    server.run();
+    Ok(())
 }
 
 fn track_sources(wasm: &Path, manifest: &Path, workspace: &Path, output: &Path) -> Result<()> {

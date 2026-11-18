@@ -1,8 +1,8 @@
 # egui-web-sandbox-build
 
-The `cli` feature provides the `egui-web-sandbox` command. Run it in the package
-directory or pass its `Cargo.toml`. It builds the package's WASM library and
-prints a loopback URL. See the [quick start](../egui-web-sandbox/docs/quick-start.md).
+The `cli` feature provides the `egui-web-sandbox <app.wasm>` command. Pass the
+WASM library already built by your project. The command generates browser bindings
+and prints a loopback URL. See the [quick start](../egui-web-sandbox/docs/quick-start.md).
 
 To build your own standalone executable instead, pair the build-script API with
 the `server` feature of `egui-web-sandbox`.

@@ -1,6 +1,7 @@
 # Quick Start
 
-Sandbox 提供 `egui-web-sandbox` 命令，自动编译用户项目的 WASM 库并启动本地 Web 服务。项目侧只需声明 WASM 库，并提供调用 App 构造函数的 Web 入口。
+项目用自己的 Cargo 命令编译 WASM 库，再把生成的 `.wasm` 交给 `egui-web-sandbox`。
+Sandbox 为产物生成浏览器绑定并提供本地 Web 服务。
 
 当前支持 egui/eframe 0.37。项目负责让共享 UI 可编译到 WASM，并适配截图、文件系统、全局快捷键等原生能力。
 
@@ -9,7 +10,9 @@ Sandbox 提供 `egui-web-sandbox` 命令，自动编译用户项目的 WASM 库�
 在 Idea2Crate 仓库根目录：
 
 ```sh
-cargo run --locked -p egui-web-sandbox-build --features cli --bin egui-web-sandbox -- examples/web-app/Cargo.toml
+cargo build --locked -p egui-web-app --lib --target wasm32-unknown-unknown
+cargo build --locked -p egui-web-sandbox-build --features cli --bin egui-web-sandbox
+./target/debug/egui-web-sandbox target/wasm32-unknown-unknown/debug/egui_web_app.wasm
 ```
 
 第一次构建需要工具链声明的 `wasm32-unknown-unknown` target。命令打印类似
@@ -49,25 +52,29 @@ pub async fn start() -> Result<egui_web_sandbox::web::WebApp, wasm_bindgen::JsVa
 }
 ```
 
-安装一次启动命令，再在应用 package 目录运行：
+安装一次启动命令：
+
+```sh
+cargo install --locked --git https://github.com/Idea2Crate/Idea2Crate --rev REVIEWED_COMMIT_SHA --features cli egui-web-sandbox-build
+```
+
+在应用目录自行编译后，传入 Cargo 生成的原始 WASM 库：
 
 ```sh
 rustup target add wasm32-unknown-unknown
-cargo install --locked --git https://github.com/Idea2Crate/Idea2Crate --rev REVIEWED_COMMIT_SHA --features cli egui-web-sandbox-build
-egui-web-sandbox
+cargo build --lib --target wasm32-unknown-unknown
+egui-web-sandbox target/wasm32-unknown-unknown/debug/my_app.wasm
 ```
 
-从 workspace 根目录运行时，传入成员的 manifest，例如
-`egui-web-sandbox preview/Cargo.toml`。命令按默认 features 编译 WASM 库，并沿用 Cargo 的
-锁文件和构建缓存。生成绑定要求项目的 wasm-bindgen 版本与命令一致，本示例固定为 0.2.130。
-原生服务器已经在安装命令时编译好，可以服务多个项目；
-项目本身无需为浏览器模式再构建原生 binary。服务只提供生成的网页和绑定资源。
+将 `my_app.wasm` 换成项目库的实际文件名。项目自行选择 Cargo features、profile 和
+输出目录。启动命令可以在其他目录运行，只需要可读的 WASM 文件。
+生成绑定要求项目的 wasm-bindgen 版本与命令一致，本示例固定为 0.2.130。
 
 需要固定端口或指定监听地址时，可以加上位置端口或 `--port PORT`，
 以及 `-b ADDRESS` 或 `--bind ADDRESS`。
 
 ```sh
-egui-web-sandbox preview/Cargo.toml 8000 --bind ::1
+egui-web-sandbox target/wasm32-unknown-unknown/debug/my_app.wasm 8000 --bind ::1
 ```
 
 这个命令打印 `http://[::1]:8000/`。端口 `0` 让系统分配空闲端口。

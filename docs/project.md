@@ -8,9 +8,9 @@ central policy service. Repository setup skills are explicitly invoked.
   asset and license needed to create or update a project's development setup.
 - `crates/egui-web-sandbox/`: reusable egui observations, browser clipboard/reset
   environment, optional Web launcher, browser clients and regression tests.
-- `crates/egui-web-sandbox-build/`: shared WASM build and binding generation for
-  the sandbox command and the build-script API for embedded Web resources.
-- `examples/web-app/`: a WASM library and App factory that the command builds and serves.
+- `crates/egui-web-sandbox-build/`: binding generation for the sandbox command
+  and the build-script API that builds and embeds Web resources.
+- `examples/web-app/`: a WASM library and App factory served by the sandbox command.
 - `examples/embedded-web-app/`: the same App served by a self-contained executable.
 - `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`: the Rust workspace and its
   reproducible development toolchain; this workspace has no application dependency.

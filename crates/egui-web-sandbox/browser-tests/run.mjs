@@ -49,12 +49,14 @@ const fixtures = createServer(async (request, response) => {
 });
 
 try {
-  // The embedded executable must work without Cargo, Python or a source directory.
+  // Both launch paths must work without Cargo, Python or a source directory.
   const embedded = process.env.SANDBOX_SERVER ?? join(target, 'debug/egui-embedded-web-app');
   const command = join(target, 'debug/egui-web-sandbox');
+  const wasm = join(target, 'wasm32-unknown-unknown/debug/egui_web_app.wasm');
+  const isolated = {cwd: empty, env: {...process.env, PATH: ''}};
   const [url, cliUrl] = await Promise.all([
-    startServer(embedded, ['0', '-b', 'localhost'], {cwd: empty, env: {...process.env, PATH: ''}}),
-    startServer(command, ['examples/web-app/Cargo.toml', '--port=0', '--bind', '::1'], {cwd: root}),
+    startServer(embedded, ['0', '-b', 'localhost'], isolated),
+    startServer(command, [wasm, '--port=0', '--bind', '::1'], isolated),
   ]);
   assert.equal(new URL(url).hostname, '127.0.0.1');
   assert.equal(new URL(cliUrl).hostname, '[::1]');
