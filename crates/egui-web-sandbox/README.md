@@ -31,27 +31,30 @@ The design has three responsibilities, within one crate:
 
 ## Serve your app
 
-Build the WASM library in your usual workflow, then pass its output to the
-sandbox command:
+Build the WASM library with Cargo and generate browser bindings with
+`wasm-bindgen --target web`. Pack the generated files into a sandbox bundle:
 
 ```sh
-egui-web-sandbox target/wasm32-unknown-unknown/debug/my_app.wasm
+egui-web-sandbox pack target/web/my_app.js target/my_app.egui-sandbox
+egui-web-sandbox target/my_app.egui-sandbox
 ```
 
-Open the loopback URL printed by the command. The CLI generates and serves
-browser bindings from memory. See the [complete example](../../examples/web-app/)
-for build commands.
+Open the loopback URL printed by the command. The bundle contains the JS entry,
+processed WASM, generated JS modules and `version.json`. See the
+[complete example](../../examples/web-app/) for build commands.
 
 The WASM library supplies the ordinary eframe App factory:
 
 ```rust,ignore
-#[wasm_bindgen]
-pub async fn start() -> Result<egui_web_sandbox::web::WebApp, JsValue> {
-    egui_web_sandbox::web::launch(Box::new(|cc| Ok(Box::new(MyApp::new(cc))))).await
+#[cfg(target_arch = "wasm32")]
+#[egui_web_sandbox::wasm_bindgen]
+fn create_app() -> eframe::AppCreator<'static> {
+    Box::new(|cc| Ok(Box::new(MyApp::new(cc))))
 }
 ```
 
-Enable `launcher` for the eframe-based startup path. It owns WebRunner and the
+The attribute exports `start()` for the included browser page. Enable `launcher`
+for the eframe-based startup path. It owns WebRunner and the
 bridge while passing the App directly to eframe, preserving lifecycle hooks.
 The optional `cli` feature builds the sandbox command, which serves the Canvas
 page, loading and error UI, and browser client.
@@ -161,8 +164,9 @@ does not establish compatibility with every existing egui application.
 暂未发布到 crates.io。浏览器上下文隔离浏览器状态，不代表构建命令、生成代码或
 外部服务处于操作系统安全沙箱中。
 
-面向应用交互 Demo 和 Agent 并行 UI 回归。`egui-web-sandbox` 命令接收已编译的 WASM
-并提供本地 Web 服务。已有 Web 宿主也可只安装观察桥接。
+面向应用交互 Demo 和 Agent 并行 UI 回归。`egui-web-sandbox pack` 把构建生成的 JS 和
+WASM 打包为一个 `.egui-sandbox` 文件，CLI 用该文件提供本地 Web 服务。
+已有 Web 宿主也可只安装观察桥接。
 业务界面继续使用标准 egui，不登记每个窗口，也不镜像业务状态。
 观察负责控件名称、状态与窗口归属；测试环境负责内存剪贴板及可选重置；虚拟桌面
 仅供特殊原生窗口模拟使用。独立工作台业务代码不导入 sandbox，表单、文本、画布

@@ -1,4 +1,5 @@
 use crate::Result;
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_decode_str, utf8_percent_encode};
 use std::{
     borrow::Cow,
     collections::BTreeMap,
@@ -7,7 +8,17 @@ use std::{
 };
 use tiny_http::{Header, Method, Response, Server};
 
-pub fn serve(generated: Vec<(String, Vec<u8>)>, address: SocketAddr) -> Result<()> {
+const URL_COMPONENT: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'_')
+    .remove(b'.')
+    .remove(b'-')
+    .remove(b'~');
+
+pub fn serve(
+    module: &str,
+    generated: BTreeMap<String, Vec<u8>>,
+    address: SocketAddr,
+) -> Result<()> {
     let files = [
         (
             "index.html",
@@ -33,6 +44,11 @@ pub fn serve(generated: Vec<(String, Vec<u8>)>, address: SocketAddr) -> Result<(
         )
         .collect();
     let server = Server::http(address)?;
+    let entry_location = Header::from_bytes(
+        "Location",
+        format!("/{}", utf8_percent_encode(module, URL_COMPONENT)),
+    )
+    .unwrap();
     let mut address = server
         .server_addr()
         .to_ip()
@@ -51,11 +67,19 @@ pub fn serve(generated: Vec<(String, Vec<u8>)>, address: SocketAddr) -> Result<(
             continue;
         }
         let path = request.url().split('?').next().unwrap_or("/");
+        let Ok(path) = percent_decode_str(path).decode_utf8() else {
+            let _ = request.respond(Response::empty(404));
+            continue;
+        };
         let name = if path == "/" {
             "index.html"
         } else {
             path.trim_start_matches('/')
         };
+        if name == "app.js" && module != name {
+            let _ = request.respond(Response::empty(302).with_header(entry_location.clone()));
+            continue;
+        }
         let Some(bytes) = assets.get(name) else {
             let _ = request.respond(Response::empty(404));
             continue;
@@ -64,6 +88,7 @@ pub fn serve(generated: Vec<(String, Vec<u8>)>, address: SocketAddr) -> Result<(
             Some("html") => "text/html; charset=utf-8",
             Some("js" | "mjs") => "text/javascript; charset=utf-8",
             Some("wasm") => "application/wasm",
+            Some("json") => "application/json",
             _ => "application/octet-stream",
         };
         let response = Response::new(

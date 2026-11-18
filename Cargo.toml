@@ -1,3 +1,3 @@
 [workspace]
-members = ["crates/egui-web-sandbox", "examples/web-app"]
+members = ["crates/egui-web-sandbox", "crates/egui-web-sandbox-macros", "examples/web-app"]
 resolver = "3"

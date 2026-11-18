@@ -9,6 +9,14 @@ pub use observe::{Control, ControlRole, Snapshot, WindowSnapshot};
 pub const PROTOCOL_VERSION: u32 = 1;
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
 pub mod web;
+#[cfg(all(feature = "launcher", target_arch = "wasm32"))]
+pub use egui_web_sandbox_macros::wasm_bindgen;
+
+#[cfg(all(feature = "launcher", target_arch = "wasm32"))]
+#[doc(hidden)]
+pub mod __private {
+    pub use {js_sys, wasm_bindgen, wasm_bindgen_futures};
+}
 
 /// One observer and in-memory test environment per egui context.
 #[derive(Clone)]

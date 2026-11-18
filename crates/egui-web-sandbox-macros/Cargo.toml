@@ -1,0 +1,19 @@
+[package]
+name = "egui-web-sandbox-macros"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+description = "WASM entry point for egui-web-sandbox"
+license = "MIT"
+publish = false
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro-crate = "3.4"
+quote = "1.0"
+syn = { version = "2.0", features = ["full"] }
+
+[lints.rust]
+unsafe_code = "forbid"

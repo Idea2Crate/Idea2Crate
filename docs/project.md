@@ -8,6 +8,8 @@ central policy service. Repository setup skills are explicitly invoked.
   asset and license needed to create or update a project's development setup.
 - `crates/egui-web-sandbox/`: reusable egui observations, browser clipboard/reset
   environment, optional Web launcher and CLI, browser clients and regression tests.
+- `crates/egui-web-sandbox-macros/`: the launcher attribute that exports the browser
+  entry from an eframe App factory.
 - `examples/web-app/`: a WASM library and App factory served by the sandbox command.
 - `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`: the Rust workspace and its
   reproducible development toolchain; this workspace has no application dependency.
@@ -31,8 +33,9 @@ CI runs these checks in one Ubuntu `verify` job, which is required for merging.
 The credential guard itself uses Python 3.9+ and the standard library.
 
 Rust hooks run formatting, WASM Clippy and native CLI Clippy.
-CI builds the sandbox command and WASM fixtures, then uses the command to test real
-browser interaction, lifecycle and startup without Cargo or a temporary directory.
+CI builds the sandbox command and WASM fixtures, runs the matching official
+`wasm-bindgen` tool and packs the outputs into `.egui-sandbox` files. It tests
+real browser interaction, lifecycle and startup with only the CLI and those bundles.
 The launcher passes the App directly to eframe to preserve its lifecycle hooks.
 Build and run commands live in the crate's [quick start](../crates/egui-web-sandbox/docs/quick-start.md).
 Keep the browser library independent of consumers, including their manifests,

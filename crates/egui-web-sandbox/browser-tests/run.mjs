@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
-import {mkdtemp, rm} from 'node:fs/promises';
+import {copyFile, mkdtemp, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -32,22 +32,32 @@ function startServer(executable, args, options) {
 
 try {
   const command = join(target, 'debug/egui-web-sandbox');
-  const wasm = join(target, 'wasm32-unknown-unknown/debug');
-  // The command only needs its WASM input and runs without Cargo or a temporary directory.
+  const web = join(target, 'web');
+  const bundles = await Promise.all(['workbench', 'notes', 'failure'].map(async app => {
+    const name = `${app}.egui-sandbox`;
+    const bundle = join(empty, name);
+    await copyFile(join(web, name), bundle);
+    return bundle;
+  }));
+  // Only the bundles are copied. Runtime has no build tools or writable temp directory.
   const noTemp = join(empty, 'no-temp-directory');
   const options = {cwd: empty, env: {...process.env, PATH: '', TMPDIR: noTemp, TEMP: noTemp, TMP: noTemp}};
   const [workbenchUrl, notesUrl, failureUrl] = await Promise.all([
-    startServer(command, [join(wasm, 'examples/basic.wasm'), '0', '-b', 'localhost'], options),
-    startServer(command, [join(wasm, 'egui_web_app.wasm'), '--port=0', '--bind', '::1'], options),
-    startServer(command, [join(wasm, 'examples/startup_failure.wasm')], options),
+    startServer(command, [bundles[0], '0', '-b', 'localhost'], options),
+    startServer(command, [bundles[1], '--port=0', '--bind', '::1'], options),
+    startServer(command, [bundles[2]], options),
   ]);
   assert.equal(new URL(workbenchUrl).hostname, '127.0.0.1');
   assert.equal(new URL(notesUrl).hostname, '[::1]');
-  for (const origin of [workbenchUrl, notesUrl]) {
+  for (const [origin, stem] of [[workbenchUrl, 'basic'], [notesUrl, 'egui_web_app']]) {
     for (const name of ['Cargo.toml', '../Cargo.toml', '.env', 'src/lib.rs']) {
       assert.equal((await fetch(new URL(name, origin))).status, 404);
     }
-    assert.equal((await fetch(new URL('app_bg.wasm', origin), {method: 'HEAD'})).headers.get('content-type'), 'application/wasm');
+    const wasm = await fetch(new URL(`${stem}_bg.wasm`, origin), {method: 'HEAD'});
+    assert.equal(wasm.headers.get('content-type'), 'application/wasm');
+    const metadata = await (await fetch(new URL('version.json', origin))).json();
+    assert.equal(metadata.format_version, 1);
+    assert.equal(metadata.entry, `${stem}.js`);
     assert.equal((await fetch(origin, {method: 'POST'})).status, 405);
   }
   const env = {
@@ -61,7 +71,7 @@ try {
     const [code] = await once(child, 'exit');
     assert.equal(code, 0, `${script} failed`);
   }
-  console.log('PASS: IPv4 and IPv6 browser access, in-memory assets, and HTTP boundaries');
+  console.log('PASS: standalone bundles, version metadata, IPv4 and IPv6, and HTTP boundaries');
 } finally {
   for (const {app} of servers) app.kill();
   await Promise.all(servers.map(({closed}) => closed));

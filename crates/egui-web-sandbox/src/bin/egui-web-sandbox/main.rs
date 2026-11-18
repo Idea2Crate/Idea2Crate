@@ -1,13 +1,14 @@
+mod bundle;
 mod cli;
 mod server;
 
-use cli::{LISTEN_HELP, Options};
-use std::{collections::BTreeMap, error::Error, path::Path};
-use wasm_bindgen_cli_support::Bindgen;
+use cli::{LISTEN_HELP, Options, PackOptions};
+use std::{env, error::Error};
 
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
-const USAGE: &str = "Usage: egui-web-sandbox <app.wasm> [PORT] [OPTIONS]";
+const USAGE: &str = "Usage: egui-web-sandbox <app.egui-sandbox> [PORT] [OPTIONS]";
+const PACK_USAGE: &str = "Usage: egui-web-sandbox pack <app.js> <app.egui-sandbox> [--app-version VERSION] [--wasm-bindgen-version VERSION]";
 
 fn main() {
     if let Err(error) = run() {
@@ -17,53 +18,24 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    let options = Options::parse()?;
+    let mut args = env::args_os().skip(1).peekable();
+    if args.next_if_eq("pack").is_some() {
+        if args
+            .peek()
+            .is_some_and(|arg| arg == "--help" || arg == "-h")
+        {
+            println!("{PACK_USAGE}\n\nPackage the output of wasm-bindgen --target web.");
+            return Ok(());
+        }
+        return bundle::pack(PackOptions::parse(args)?);
+    }
+    let options = Options::parse(args)?;
     if options.help {
-        println!(
-            "{USAGE}\n\nServe an app compiled for wasm32-unknown-unknown with wasm-bindgen.\n\n{LISTEN_HELP}"
-        );
+        println!("{USAGE}\n\nServe a prebuilt web app bundle.\n\n{LISTEN_HELP}\n\n{PACK_USAGE}");
         return Ok(());
     }
-    let wasm = options.wasm.ok_or(USAGE)?;
-    server::serve(generate_assets(&wasm)?, options.address)
-}
-
-fn generate_assets(wasm: &Path) -> Result<Vec<(String, Vec<u8>)>> {
-    let mut output = Bindgen::new()
-        .input_path(wasm)
-        .web(true)?
-        .omit_default_module_path(false)
-        .typescript(false)
-        .out_name("app")
-        .generate_output()?;
-    let mut assets = vec![
-        ("app.js".into(), output.js().as_bytes().to_vec()),
-        ("app_bg.wasm".into(), output.wasm_mut().emit_wasm()),
-    ];
-    if let Some(start) = output.start() {
-        assets.push(("app_bg.js".into(), start.as_bytes().to_vec()));
-    }
-
-    // Match wasm-bindgen's output layout so its generated imports still resolve.
-    for (crate_id, snippets) in output.snippets() {
-        for (index, source) in snippets.iter().enumerate() {
-            assets.push((
-                format!("snippets/{crate_id}/inline{index}.js"),
-                source.as_bytes().to_vec(),
-            ));
-        }
-    }
-    for (path, source) in output.local_modules() {
-        assets.push((format!("snippets/{path}"), source.as_bytes().to_vec()));
-    }
-    if !output.npm_dependencies().is_empty() {
-        let dependencies: BTreeMap<_, _> = output
-            .npm_dependencies()
-            .iter()
-            .map(|(name, (_, version))| (name, version))
-            .collect();
-        let manifest = serde_json::json!({ "dependencies": dependencies });
-        assets.push(("package.json".into(), serde_json::to_vec_pretty(&manifest)?));
-    }
-    Ok(assets)
+    let path = options.bundle.ok_or(USAGE)?;
+    let bundle = bundle::open(&path)
+        .map_err(|error| format!("could not open {}: {error}", path.display()))?;
+    server::serve(&bundle.entry, bundle.assets, options.address)
 }

@@ -1,18 +1,22 @@
 # Quick Start
 
-项目用自己的 Cargo 命令编译 WASM 库，再把生成的 `.wasm` 交给 `egui-web-sandbox`。
-Sandbox 在内存中生成浏览器绑定并提供本地 Web 服务，启动时无需 Cargo 或可写的临时目录。
+项目先用 Cargo 编译 WASM 库，再用官方 `wasm-bindgen` 生成浏览器资源。
+`egui-web-sandbox pack` 把资源打包为一个 `.egui-sandbox` 文件。
+启动本地 Web 服务只需要 CLI 和这一个文件。
 
 当前支持 egui/eframe 0.37。项目负责让共享 UI 可编译到 WASM，并适配截图、文件系统、全局快捷键等原生能力。
 
 ## 1. 运行完整示例
 
-在 Idea2Crate 仓库根目录：
+在 Idea2Crate 仓库根目录执行。首次构建时安装匹配的 `wasm-bindgen`：
 
 ```sh
+cargo install --locked --bin wasm-bindgen wasm-bindgen-cli --version '=0.2.130'
 cargo build --locked -p egui-web-app --lib --target wasm32-unknown-unknown
+wasm-bindgen --target web --no-typescript --out-dir target/web/notes target/wasm32-unknown-unknown/debug/egui_web_app.wasm
 cargo build --locked -p egui-web-sandbox --features cli --bin egui-web-sandbox
-./target/debug/egui-web-sandbox target/wasm32-unknown-unknown/debug/egui_web_app.wasm
+./target/debug/egui-web-sandbox pack target/web/notes/egui_web_app.js target/web/notes.egui-sandbox --app-version 0.1.0 --wasm-bindgen-version 0.2.130
+./target/debug/egui-web-sandbox target/web/notes.egui-sandbox
 ```
 
 第一次构建需要工具链声明的 `wasm32-unknown-unknown` target。命令打印类似
@@ -36,47 +40,54 @@ crate-type = ["cdylib"]
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 egui-web-sandbox = { version = "0.1.0", git = "https://github.com/Idea2Crate/Idea2Crate", rev = "REVIEWED_COMMIT_SHA", features = ["launcher"] }
 eframe = { version = "0.37", default-features = false, features = ["glow", "default_fonts"] }
-wasm-bindgen = "=0.2.130"
-wasm-bindgen-futures = "0.4"
 ```
 
-`cdylib` 产出交给 sandbox 的 `.wasm`。同一个库还要供其他 Rust 目标链接时，再加上 `rlib`。
+`cdylib` 产出交给 `wasm-bindgen` 的原始 `.wasm`。同一个库还要供其他 Rust 目标链接时，再加上 `rlib`。
 
 在库的 WASM 入口提供 App 构造函数：
 
 ```rust,ignore
 #[cfg(target_arch = "wasm32")]
-#[wasm_bindgen::prelude::wasm_bindgen]
-pub async fn start() -> Result<egui_web_sandbox::web::WebApp, wasm_bindgen::JsValue> {
-    egui_web_sandbox::web::launch(Box::new(|cc| {
-        Ok(Box::new(MyApp::new(cc)))
-    })).await
+#[egui_web_sandbox::wasm_bindgen]
+fn create_app() -> eframe::AppCreator<'static> {
+    Box::new(|cc| Ok(Box::new(MyApp::new(cc))))
 }
 ```
 
-安装一次启动命令：
+属性宏接收无参数、同步的工厂函数，导出页面调用的 `start()`。
+该入口使用标准 `#canvas` 和默认的 eframe WebOptions，每个 WASM 模块声明一次。
+
+安装构建工具和启动命令：
 
 ```sh
+cargo install --locked --bin wasm-bindgen wasm-bindgen-cli --version '=0.2.130'
 cargo install --locked --git https://github.com/Idea2Crate/Idea2Crate --rev REVIEWED_COMMIT_SHA --features cli egui-web-sandbox
 ```
 
-在应用目录自行编译后，传入 Cargo 生成的原始 WASM 库：
+在应用目录编译并生成绑定，再启动服务：
 
 ```sh
 rustup target add wasm32-unknown-unknown
 cargo build --lib --target wasm32-unknown-unknown
-egui-web-sandbox target/wasm32-unknown-unknown/debug/my_app.wasm
+wasm-bindgen --target web --no-typescript --out-dir target/web target/wasm32-unknown-unknown/debug/my_app.wasm
+egui-web-sandbox pack target/web/my_app.js target/my_app.egui-sandbox --wasm-bindgen-version 0.2.130
+egui-web-sandbox target/my_app.egui-sandbox
 ```
 
-将 `my_app.wasm` 换成项目库的实际文件名。项目自行选择 Cargo features、profile 和
-输出目录。启动命令可以在其他目录运行，只需要可读的 WASM 文件。
-生成绑定要求项目的 wasm-bindgen 版本与命令一致，本示例固定为 0.2.130。
+将 `my_app` 换成项目库的实际文件名。项目自行选择 Cargo features、profile 和输出目录。
+`wasm-bindgen` 在 Cargo 链接完成后执行，其版本须与构建所用的库版本一致，本示例用 0.2.130。
+给 `wasm-bindgen` 选一个独立的输出目录。打包会收录 JS 入口、同名的 `_bg.wasm`、
+可选的 `_bg.js` 和 `snippets/` 下的 JS 模块，并保留这些文件的相对路径。
+
+包体使用未压缩的 ZIP。根目录的 `version.json` 记录 `format_version`、`entry` 和
+`packer_version`，也可用 `--app-version` 和 `--wasm-bindgen-version` 记录实际构建版本。
+服务用 `format_version` 判断兼容性，并可通过 `/version.json` 查询当前包的版本。
 
 需要固定端口或指定监听地址时，可以加上位置端口或 `--port PORT`，
 以及 `-b ADDRESS` 或 `--bind ADDRESS`。
 
 ```sh
-egui-web-sandbox target/wasm32-unknown-unknown/debug/my_app.wasm 8000 --bind ::1
+egui-web-sandbox target/my_app.egui-sandbox 8000 --bind ::1
 ```
 
 这个命令打印 `http://[::1]:8000/`。端口 `0` 让系统分配空闲端口。
@@ -96,6 +107,12 @@ egui-web-sandbox target/wasm32-unknown-unknown/debug/my_app.wasm 8000 --bind ::1
 | 文件系统、截图、系统剪贴板、全局快捷键 | 浏览器能力或内存测试替身 |
 | 本地存储、网络请求、异步任务 | 数据隔离、任务取消和可选重置 |
 | 自定义原生窗口命令 | 按需使用 `desktop::Desktop` 模拟 |
+
+普通 `egui::Window` 打开页面就能拖动和缩放。需要模拟原生窗口命令时，
+在 Web 入口用 `Desktop::new(Sandbox::install(&cc.egui_ctx))` 创建每个 App 的虚拟桌面，
+存到 Web 适配器中。适配器每帧调用 `begin_frame`，登记窗口，并用 `update_window` 更新应用
+持有的矩形。原生风格的 `StartDrag` 和 `BeginResize` 转给 `window_command`。
+窗口内容、锁定和模态规则由应用负责。见 [Desktop API](../src/desktop.rs)。
 
 ## 4. Agent 用正常浏览器输入操作
 

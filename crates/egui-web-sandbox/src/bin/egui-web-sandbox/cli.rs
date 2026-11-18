@@ -1,11 +1,12 @@
 use std::{
-    env,
-    ffi::OsStr,
+    ffi::{OsStr, OsString},
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::PathBuf,
 };
 
-use super::Result;
+use super::{PACK_USAGE, Result};
+
+pub const BUNDLE_EXTENSION: &str = "egui-sandbox";
 
 pub const LISTEN_HELP: &str = "\
   -b, --bind ADDRESS  Listen on this IPv4 or IPv6 address [default: 127.0.0.1]
@@ -15,15 +16,14 @@ pub const LISTEN_HELP: &str = "\
 pub struct Options {
     pub address: SocketAddr,
     pub help: bool,
-    pub wasm: Option<PathBuf>,
+    pub bundle: Option<PathBuf>,
 }
 
 impl Options {
-    pub fn parse() -> Result<Self> {
-        let mut args = env::args_os().skip(1);
+    pub fn parse(mut args: impl Iterator<Item = OsString>) -> Result<Self> {
         let mut ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
         let mut port = None;
-        let mut wasm = None;
+        let mut bundle = None;
         let mut help = false;
         while let Some(arg) = args.next() {
             let (flag, value) = match arg.to_str() {
@@ -35,12 +35,12 @@ impl Options {
                         !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit())
                     }) {
                         set_port(&mut port, &arg)?;
-                    } else if wasm.is_none()
+                    } else if bundle.is_none()
                         && PathBuf::from(&arg)
                             .extension()
-                            .is_some_and(|extension| extension == "wasm")
+                            .is_some_and(|extension| extension == BUNDLE_EXTENSION)
                     {
-                        wasm = Some(arg.into());
+                        bundle = Some(arg.into());
                     } else {
                         return Err(format!("unexpected argument {arg:?}").into());
                     }
@@ -75,8 +75,50 @@ impl Options {
         Ok(Self {
             address: SocketAddr::new(ip, port.unwrap_or(0)),
             help,
-            wasm,
+            bundle,
         })
+    }
+}
+
+pub struct PackOptions {
+    pub entry: PathBuf,
+    pub output: PathBuf,
+    pub app_version: Option<String>,
+    pub wasm_bindgen_version: Option<String>,
+}
+
+impl PackOptions {
+    pub fn parse(mut args: impl Iterator<Item = OsString>) -> Result<Self> {
+        let entry = PathBuf::from(args.next().ok_or(PACK_USAGE)?);
+        let output = PathBuf::from(args.next().ok_or(PACK_USAGE)?);
+        if entry.extension() != Some(OsStr::new("js"))
+            || output.extension() != Some(OsStr::new(BUNDLE_EXTENSION))
+        {
+            return Err(PACK_USAGE.into());
+        }
+        let mut options = Self {
+            entry,
+            output,
+            app_version: None,
+            wasm_bindgen_version: None,
+        };
+        while let Some(flag) = args.next() {
+            let version = match flag.to_str() {
+                Some("--app-version") => &mut options.app_version,
+                Some("--wasm-bindgen-version") => &mut options.wasm_bindgen_version,
+                _ => return Err(format!("unknown pack option {flag:?}").into()),
+            };
+            if version.is_some() {
+                return Err(format!("specify {flag:?} only once").into());
+            }
+            *version = Some(
+                args.next()
+                    .and_then(|value| value.into_string().ok())
+                    .filter(|value| !value.is_empty() && !value.starts_with('-'))
+                    .ok_or_else(|| format!("{flag:?} requires a version"))?,
+            );
+        }
+        Ok(options)
     }
 }
 

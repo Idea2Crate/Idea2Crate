@@ -1,15 +1,9 @@
 #[cfg(target_arch = "wasm32")]
 mod app;
 
-#[cfg(target_arch = "wasm32")]
-use {
-    egui_web_sandbox::web::{WebApp, launch},
-    wasm_bindgen::prelude::*,
-};
-
 /// The Web entry supplies only the ordinary App factory.
 #[cfg(target_arch = "wasm32")]
-#[wasm_bindgen]
-pub async fn start() -> Result<WebApp, JsValue> {
-    launch(Box::new(|cc| Ok(Box::new(app::Notes::new(cc))))).await
+#[egui_web_sandbox::wasm_bindgen]
+fn create_app() -> eframe::AppCreator<'static> {
+    Box::new(|cc| Ok(Box::new(app::Notes::new(cc))))
 }
