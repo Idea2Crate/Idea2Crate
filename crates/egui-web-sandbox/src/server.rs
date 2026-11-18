@@ -1,11 +1,20 @@
 //! Serve an embedded Web build. The executable needs neither Cargo nor source files.
-use std::{borrow::Cow, collections::BTreeMap, error::Error, io::Cursor, net::Ipv4Addr};
+use std::{
+    borrow::Cow,
+    collections::BTreeMap,
+    error::Error,
+    io::Cursor,
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr},
+};
 use tiny_http::{Header, Method, Response};
+
+#[doc(hidden)]
+pub mod cli;
 
 pub type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 pub type Assets = &'static [(&'static str, &'static [u8])];
 
-/// A loopback-only server. Binding port 0 chooses an unused port for each instance.
+/// A Web resource server. Binding port 0 chooses an unused port for each instance.
 pub struct Server {
     http: tiny_http::Server,
     assets: BTreeMap<Cow<'static, str>, Cow<'static, [u8]>>,
@@ -23,6 +32,14 @@ impl Server {
         assets: impl IntoIterator<Item = (impl Into<Cow<'static, str>>, impl Into<Cow<'static, [u8]>>)>,
         port: u16,
     ) -> Result<Self> {
+        Self::bind_assets_at(assets, SocketAddr::from((Ipv4Addr::LOCALHOST, port)))
+    }
+
+    /// Bind generated resources to an explicit address and port.
+    pub fn bind_assets_at(
+        assets: impl IntoIterator<Item = (impl Into<Cow<'static, str>>, impl Into<Cow<'static, [u8]>>)>,
+        address: SocketAddr,
+    ) -> Result<Self> {
         let files = [
             (
                 "index.html",
@@ -39,7 +56,7 @@ impl Server {
             ("LICENSE.txt", include_bytes!("../LICENSE").as_slice()),
         ];
         Ok(Self {
-            http: tiny_http::Server::http((Ipv4Addr::LOCALHOST, port))?,
+            http: tiny_http::Server::http(address)?,
             assets: files
                 .into_iter()
                 .map(|(name, bytes)| (Cow::Borrowed(name), Cow::Borrowed(bytes)))
@@ -53,7 +70,18 @@ impl Server {
     }
 
     pub fn url(&self) -> String {
-        format!("http://{}/", self.http.server_addr())
+        let mut address = self
+            .http
+            .server_addr()
+            .to_ip()
+            .expect("bound to an IP address");
+        if address.ip().is_unspecified() {
+            address.set_ip(match address {
+                SocketAddr::V4(_) => Ipv4Addr::LOCALHOST.into(),
+                SocketAddr::V6(_) => Ipv6Addr::LOCALHOST.into(),
+            });
+        }
+        format!("http://{address}/")
     }
 
     /// Serve on this thread until `stop()` or process exit. Use one request loop per server.
@@ -103,6 +131,20 @@ impl Server {
 /// Bind an unused loopback port, print its URL and serve the embedded app.
 pub fn serve(assets: Assets) -> Result<()> {
     let server = Server::bind(assets, 0)?;
+    println!("{}", server.url());
+    server.run();
+    Ok(())
+}
+
+/// Serve the embedded app with `[PORT]`, `--port PORT` and `--bind ADDRESS`
+/// from the executable's command line. Use this as the entry point of a Web demo.
+pub fn serve_from_args(assets: Assets) -> Result<()> {
+    let options = cli::Options::parse(false)?;
+    if options.help {
+        println!("Usage: <program> [PORT] [OPTIONS]\n\n{}", cli::LISTEN_HELP);
+        return Ok(());
+    }
+    let server = Server::bind_assets_at(assets.iter().copied(), options.address)?;
     println!("{}", server.url());
     server.run();
     Ok(())

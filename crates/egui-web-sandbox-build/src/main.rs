@@ -1,7 +1,5 @@
+use egui_web_sandbox::server::cli::{LISTEN_HELP, Options};
 use egui_web_sandbox_build::{Builder, Result};
-use std::{env, path::Path};
-
-const USAGE: &str = "Usage: egui-web-sandbox [path/to/Cargo.toml]";
 
 fn main() {
     if let Err(error) = run() {
@@ -11,20 +9,13 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    let mut args = env::args_os().skip(1);
-    let manifest = args.next().unwrap_or_else(|| "Cargo.toml".into());
-    if args.next().is_some() {
-        return Err(USAGE.into());
-    }
-    if manifest == "--help" || manifest == "-h" {
-        println!("{USAGE}\nBuild the package's WASM library and serve it on localhost.");
+    let options = Options::parse(true)?;
+    if options.help {
+        println!(
+            "Usage: egui-web-sandbox [path/to/Cargo.toml] [PORT] [OPTIONS]\n\nBuild and serve the package's WASM library.\n\n{LISTEN_HELP}"
+        );
         return Ok(());
     }
-    if Path::new(&manifest)
-        .file_name()
-        .is_none_or(|name| name != "Cargo.toml")
-    {
-        return Err(USAGE.into());
-    }
-    Builder::default().serve(Path::new(&manifest))
+    let manifest = options.manifest.unwrap_or_else(|| "Cargo.toml".into());
+    Builder::default().serve_at(&manifest, options.address)
 }

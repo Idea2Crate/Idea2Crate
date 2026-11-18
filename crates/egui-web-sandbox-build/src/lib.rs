@@ -67,6 +67,15 @@ impl Builder {
     /// Compile the library in this manifest and serve it using a local port.
     #[cfg(feature = "cli")]
     pub fn serve(self, manifest: &Path) -> Result<()> {
+        self.serve_at(
+            manifest,
+            std::net::SocketAddr::from((std::net::Ipv4Addr::LOCALHOST, 0)),
+        )
+    }
+
+    /// Compile the Web library and serve it at the given address and port.
+    #[cfg(feature = "cli")]
+    pub fn serve_at(self, manifest: &Path, address: std::net::SocketAddr) -> Result<()> {
         let (wasm, _) = self.compile(manifest, None, false)?;
         let site = tempfile::tempdir()?;
         let assets = generate(&wasm, site.path())?
@@ -74,7 +83,7 @@ impl Builder {
             .map(|(name, path)| Ok((name, fs::read(path)?)))
             .collect::<std::io::Result<Vec<_>>>()?;
         site.close()?;
-        let server = egui_web_sandbox::server::Server::bind_assets(assets, 0)?;
+        let server = egui_web_sandbox::server::Server::bind_assets_at(assets, address)?;
         println!("{}", server.url());
         server.run();
         Ok(())

@@ -16,7 +16,7 @@ cargo run --locked -p egui-web-sandbox-build --features cli --bin egui-web-sandb
 `http://127.0.0.1:49152/` 的地址，打开即可操作 Notes 应用。每次运行使用空闲端口，
 可同时启动多个进程；每个 BrowserContext／页面还有独立的 App 和内存剪贴板。
 
-命令只监听本机回环地址。Ctrl+C 结束服务。
+默认监听本机回环地址 `127.0.0.1`。Ctrl+C 结束服务。
 
 示例只有 Cargo 配置、普通 egui 界面和 WASM 入口，没有 `main.rs` 或 `build.rs`。
 见 [examples/web-app](../../../examples/web-app/)。
@@ -62,6 +62,17 @@ egui-web-sandbox
 锁文件和构建缓存。生成绑定要求项目的 wasm-bindgen 版本与命令一致，本示例固定为 0.2.130。
 原生服务器已经在安装命令时编译好，可以服务多个项目；
 项目本身无需为浏览器模式再构建原生 binary。服务只提供生成的网页和绑定资源。
+
+需要固定端口或指定监听地址时，可以加上位置端口或 `--port PORT`，
+以及 `-b ADDRESS` 或 `--bind ADDRESS`。
+
+```sh
+egui-web-sandbox preview/Cargo.toml 8000 --bind 127.0.0.1
+```
+
+端口 `0` 让系统分配空闲端口。地址支持 IPv4 和 IPv6，例如 `::1`。
+显式指定 `0.0.0.0` 或 `::` 会监听相应的所有网络接口。
+用 `egui-web-sandbox --help` 查看参数。
 
 ## 3. 接入现有项目时的配置
 

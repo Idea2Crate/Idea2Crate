@@ -53,8 +53,8 @@ try {
   const embedded = process.env.SANDBOX_SERVER ?? join(target, 'debug/egui-embedded-web-app');
   const command = join(target, 'debug/egui-web-sandbox');
   const [url, cliUrl] = await Promise.all([
-    startServer(embedded, [], {cwd: empty, env: {...process.env, PATH: ''}}),
-    startServer(command, ['examples/web-app/Cargo.toml'], {cwd: root}),
+    startServer(embedded, ['0', '-b', 'localhost'], {cwd: empty, env: {...process.env, PATH: ''}}),
+    startServer(command, ['examples/web-app/Cargo.toml', '--port=0', '--bind', '127.0.0.1'], {cwd: root}),
   ]);
   assert.notEqual(url, cliUrl);
   for (const origin of [url, cliUrl]) {
