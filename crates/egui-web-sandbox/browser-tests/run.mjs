@@ -34,7 +34,7 @@ try {
   const command = join(target, 'debug/egui-web-sandbox');
   const web = join(target, 'web');
   const bundles = await Promise.all(['workbench', 'notes', 'failure'].map(async app => {
-    const name = `${app}.egui-sandbox`;
+    const name = `${app}.egsx`;
     const bundle = join(empty, name);
     await copyFile(join(web, name), bundle);
     return bundle;

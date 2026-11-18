@@ -35,12 +35,13 @@ Build the WASM library with Cargo and generate browser bindings with
 `wasm-bindgen --target web`. Pack the generated files into a sandbox bundle:
 
 ```sh
-egui-web-sandbox pack target/web/my_app.js target/my_app.egui-sandbox
-egui-web-sandbox target/my_app.egui-sandbox
+egui-web-sandbox pack target/web/my_app.js target/my_app.egsx
+egui-web-sandbox target/my_app.egsx
 ```
 
 Open the loopback URL printed by the command. The bundle contains the JS entry,
-processed WASM, generated JS modules and `version.json`. See the
+processed WASM, generated JS modules and `version.json`. Inspect it with standard
+ZIP tools, for example `unzip -l target/my_app.egsx`. See the
 [complete example](../../examples/web-app/) for build commands.
 
 The WASM library supplies the ordinary eframe App factory:
@@ -165,7 +166,7 @@ does not establish compatibility with every existing egui application.
 外部服务处于操作系统安全沙箱中。
 
 面向应用交互 Demo 和 Agent 并行 UI 回归。`egui-web-sandbox pack` 把构建生成的 JS 和
-WASM 打包为一个 `.egui-sandbox` 文件，CLI 用该文件提供本地 Web 服务。
+WASM 打包为一个 `.egsx` 文件，CLI 用该文件提供本地 Web 服务。
 已有 Web 宿主也可只安装观察桥接。
 业务界面继续使用标准 egui，不登记每个窗口，也不镜像业务状态。
 观察负责控件名称、状态与窗口归属；测试环境负责内存剪贴板及可选重置；虚拟桌面

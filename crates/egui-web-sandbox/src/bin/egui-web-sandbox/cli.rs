@@ -6,7 +6,7 @@ use std::{
 
 use super::{PACK_USAGE, Result};
 
-pub const BUNDLE_EXTENSION: &str = "egui-sandbox";
+const BUNDLE_EXTENSION: &str = "egsx";
 
 pub const LISTEN_HELP: &str = "\
   -b, --bind ADDRESS  Listen on this IPv4 or IPv6 address [default: 127.0.0.1]

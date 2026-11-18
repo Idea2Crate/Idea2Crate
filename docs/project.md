@@ -34,7 +34,7 @@ The credential guard itself uses Python 3.9+ and the standard library.
 
 Rust hooks run formatting, WASM Clippy and native CLI Clippy.
 CI builds the sandbox command and WASM fixtures, runs the matching official
-`wasm-bindgen` tool and packs the outputs into `.egui-sandbox` files. It tests
+`wasm-bindgen` tool and packs the outputs into `.egsx` files. It tests
 real browser interaction, lifecycle and startup with only the CLI and those bundles.
 The launcher passes the App directly to eframe to preserve its lifecycle hooks.
 Build and run commands live in the crate's [quick start](../crates/egui-web-sandbox/docs/quick-start.md).

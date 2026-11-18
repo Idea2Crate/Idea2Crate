@@ -1,7 +1,7 @@
 # Quick Start
 
 项目先用 Cargo 编译 WASM 库，再用官方 `wasm-bindgen` 生成浏览器资源。
-`egui-web-sandbox pack` 把资源打包为一个 `.egui-sandbox` 文件。
+`egui-web-sandbox pack` 把资源打包为一个 `.egsx` 文件。
 启动本地 Web 服务只需要 CLI 和这一个文件。
 
 当前支持 egui/eframe 0.37。项目负责让共享 UI 可编译到 WASM，并适配截图、文件系统、全局快捷键等原生能力。
@@ -15,8 +15,8 @@ cargo install --locked --bin wasm-bindgen wasm-bindgen-cli --version '=0.2.130'
 cargo build --locked -p egui-web-app --lib --target wasm32-unknown-unknown
 wasm-bindgen --target web --no-typescript --out-dir target/web/notes target/wasm32-unknown-unknown/debug/egui_web_app.wasm
 cargo build --locked -p egui-web-sandbox --features cli --bin egui-web-sandbox
-./target/debug/egui-web-sandbox pack target/web/notes/egui_web_app.js target/web/notes.egui-sandbox --app-version 0.1.0 --wasm-bindgen-version 0.2.130
-./target/debug/egui-web-sandbox target/web/notes.egui-sandbox
+./target/debug/egui-web-sandbox pack target/web/notes/egui_web_app.js target/web/notes.egsx --app-version 0.1.0 --wasm-bindgen-version 0.2.130
+./target/debug/egui-web-sandbox target/web/notes.egsx
 ```
 
 第一次构建需要工具链声明的 `wasm32-unknown-unknown` target。命令打印类似
@@ -70,8 +70,8 @@ cargo install --locked --git https://github.com/Idea2Crate/Idea2Crate --rev REVI
 rustup target add wasm32-unknown-unknown
 cargo build --lib --target wasm32-unknown-unknown
 wasm-bindgen --target web --no-typescript --out-dir target/web target/wasm32-unknown-unknown/debug/my_app.wasm
-egui-web-sandbox pack target/web/my_app.js target/my_app.egui-sandbox --wasm-bindgen-version 0.2.130
-egui-web-sandbox target/my_app.egui-sandbox
+egui-web-sandbox pack target/web/my_app.js target/my_app.egsx --wasm-bindgen-version 0.2.130
+egui-web-sandbox target/my_app.egsx
 ```
 
 将 `my_app` 换成项目库的实际文件名。项目自行选择 Cargo features、profile 和输出目录。
@@ -79,7 +79,8 @@ egui-web-sandbox target/my_app.egui-sandbox
 给 `wasm-bindgen` 选一个独立的输出目录。打包会收录 JS 入口、同名的 `_bg.wasm`、
 可选的 `_bg.js` 和 `snippets/` 下的 JS 模块，并保留这些文件的相对路径。
 
-包体使用未压缩的 ZIP。根目录的 `version.json` 记录 `format_version`、`entry` 和
+包体使用标准 ZIP，条目以未压缩方式存储。运行 `unzip target/my_app.egsx -d target/inspect` 即可解包。
+根目录的 `version.json` 记录 `format_version`、`entry` 和
 `packer_version`，也可用 `--app-version` 和 `--wasm-bindgen-version` 记录实际构建版本。
 服务用 `format_version` 判断兼容性，并可通过 `/version.json` 查询当前包的版本。
 
@@ -87,7 +88,7 @@ egui-web-sandbox target/my_app.egui-sandbox
 以及 `-b ADDRESS` 或 `--bind ADDRESS`。
 
 ```sh
-egui-web-sandbox target/my_app.egui-sandbox 8000 --bind ::1
+egui-web-sandbox target/my_app.egsx 8000 --bind ::1
 ```
 
 这个命令打印 `http://[::1]:8000/`。端口 `0` 让系统分配空闲端口。

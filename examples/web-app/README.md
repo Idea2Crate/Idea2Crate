@@ -7,11 +7,11 @@ cargo install --locked --bin wasm-bindgen wasm-bindgen-cli --version '=0.2.130'
 cargo build --locked -p egui-web-app --lib --target wasm32-unknown-unknown
 wasm-bindgen --target web --no-typescript --out-dir target/web/notes target/wasm32-unknown-unknown/debug/egui_web_app.wasm
 cargo build --locked -p egui-web-sandbox --features cli --bin egui-web-sandbox
-./target/debug/egui-web-sandbox pack target/web/notes/egui_web_app.js target/web/notes.egui-sandbox --app-version 0.1.0 --wasm-bindgen-version 0.2.130
-./target/debug/egui-web-sandbox target/web/notes.egui-sandbox
+./target/debug/egui-web-sandbox pack target/web/notes/egui_web_app.js target/web/notes.egsx --app-version 0.1.0 --wasm-bindgen-version 0.2.130
+./target/debug/egui-web-sandbox target/web/notes.egsx
 ```
 
-Open the loopback URL printed by the command. Copy only `notes.egui-sandbox` and
+Open the loopback URL printed by the command. Copy only `notes.egsx` and
 the CLI to another machine to serve the same build.
 
 - `src/app.rs` is an ordinary eframe App with UI and logic hooks.

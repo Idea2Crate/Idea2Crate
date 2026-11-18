@@ -7,8 +7,8 @@ use std::{env, error::Error};
 
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
-const USAGE: &str = "Usage: egui-web-sandbox <app.egui-sandbox> [PORT] [OPTIONS]";
-const PACK_USAGE: &str = "Usage: egui-web-sandbox pack <app.js> <app.egui-sandbox> [--app-version VERSION] [--wasm-bindgen-version VERSION]";
+const USAGE: &str = "Usage: egui-web-sandbox <app.egsx> [PORT] [OPTIONS]";
+const PACK_USAGE: &str = "Usage: egui-web-sandbox pack <app.js> <app.egsx> [--app-version VERSION] [--wasm-bindgen-version VERSION]";
 
 fn main() {
     if let Err(error) = run() {
