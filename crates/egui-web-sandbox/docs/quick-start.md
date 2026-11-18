@@ -33,7 +33,7 @@ crate-type = ["cdylib", "rlib"]
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 egui-web-sandbox = { version = "0.1.0", git = "https://github.com/Idea2Crate/Idea2Crate", rev = "REVIEWED_COMMIT_SHA", features = ["launcher"] }
 eframe = { version = "0.37", default-features = false, features = ["glow", "default_fonts"] }
-wasm-bindgen = "0.2"
+wasm-bindgen = "=0.2.130"
 wasm-bindgen-futures = "0.4"
 ```
 
@@ -58,8 +58,9 @@ egui-web-sandbox
 ```
 
 从 workspace 根目录运行时，传入成员的 manifest，例如
-`egui-web-sandbox preview/Cargo.toml`。命令按项目的 Cargo.lock 和默认 features 编译
-WASM 库，并复用项目的 Cargo 缓存。原生服务器已经在安装命令时编译好，可以服务多个项目；
+`egui-web-sandbox preview/Cargo.toml`。命令按默认 features 编译 WASM 库，并沿用 Cargo 的
+锁文件和构建缓存。生成绑定要求项目的 wasm-bindgen 版本与命令一致，本示例固定为 0.2.130。
+原生服务器已经在安装命令时编译好，可以服务多个项目；
 项目本身无需为浏览器模式再构建原生 binary。服务只提供生成的网页和绑定资源。
 
 ## 3. 接入现有项目时的配置

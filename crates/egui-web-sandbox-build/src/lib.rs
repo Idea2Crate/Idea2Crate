@@ -95,7 +95,6 @@ impl Builder {
             .current_dir(project)
             .args([
                 "metadata",
-                "--locked",
                 "--no-deps",
                 "--format-version",
                 "1",
@@ -130,7 +129,6 @@ impl Builder {
             .current_dir(project)
             .args([
                 "build",
-                "--locked",
                 "--lib",
                 "--target",
                 "wasm32-unknown-unknown",
@@ -142,8 +140,10 @@ impl Builder {
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
         if let Some(target_dir) = target_dir {
-            // A nested build uses its own target cache and WASM-specific flags.
+            // The enclosing Cargo build owns the lockfile. Use a separate target
+            // cache and let Cargo recompute flags for WASM.
             command
+                .arg("--locked")
                 .arg("--target-dir")
                 .arg(target_dir)
                 .env_remove("CARGO_ENCODED_RUSTFLAGS")
