@@ -26,7 +26,7 @@ function startServer(executable, args, options) {
     app.once('close', code => { clearTimeout(timeout); reject(Error(`Server exited (${code}): ${diagnostics}`)); });
     app.stdout.on('data', data => {
       output += data;
-      const url = output.match(/http:\/\/127\.0\.0\.1:\d+\//)?.[0];
+      const url = output.match(/http:\/\/(?:127\.0\.0\.1|\[::1\]):\d+\//)?.[0];
       if (url) { clearTimeout(timeout); resolve(url); }
     });
   });
@@ -54,9 +54,10 @@ try {
   const command = join(target, 'debug/egui-web-sandbox');
   const [url, cliUrl] = await Promise.all([
     startServer(embedded, ['0', '-b', 'localhost'], {cwd: empty, env: {...process.env, PATH: ''}}),
-    startServer(command, ['examples/web-app/Cargo.toml', '--port=0', '--bind', '127.0.0.1'], {cwd: root}),
+    startServer(command, ['examples/web-app/Cargo.toml', '--port=0', '--bind', '::1'], {cwd: root}),
   ]);
-  assert.notEqual(url, cliUrl);
+  assert.equal(new URL(url).hostname, '127.0.0.1');
+  assert.equal(new URL(cliUrl).hostname, '[::1]');
   for (const origin of [url, cliUrl]) {
     for (const name of ['Cargo.toml', '../Cargo.toml', '.env', 'src/lib.rs']) {
       assert.equal((await fetch(new URL(name, origin))).status, 404);
@@ -72,7 +73,7 @@ try {
     const [code] = await once(child, 'exit');
     assert.equal(code, 0, `${script} failed`);
   }
-  console.log('PASS: self-contained native server, empty PATH/cwd, embedded assets and HTTP boundaries');
+  console.log('PASS: IPv4 and IPv6 browser access, empty PATH/cwd, embedded assets and HTTP boundaries');
 } finally {
   fixtures.closeAllConnections();
   fixtures.close();

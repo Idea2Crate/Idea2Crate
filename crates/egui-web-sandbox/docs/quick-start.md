@@ -67,10 +67,10 @@ egui-web-sandbox
 以及 `-b ADDRESS` 或 `--bind ADDRESS`。
 
 ```sh
-egui-web-sandbox preview/Cargo.toml 8000 --bind 127.0.0.1
+egui-web-sandbox preview/Cargo.toml 8000 --bind ::1
 ```
 
-端口 `0` 让系统分配空闲端口。地址支持 IPv4 和 IPv6，例如 `::1`。
+这个命令打印 `http://[::1]:8000/`。端口 `0` 让系统分配空闲端口。
 显式指定 `0.0.0.0` 或 `::` 会监听相应的所有网络接口。
 用 `egui-web-sandbox --help` 查看参数。
 
