@@ -1,7 +1,7 @@
 # Quick Start
 
 项目用自己的 Cargo 命令编译 WASM 库，再把生成的 `.wasm` 交给 `egui-web-sandbox`。
-Sandbox 为产物生成浏览器绑定并提供本地 Web 服务。
+Sandbox 在内存中生成浏览器绑定并提供本地 Web 服务，启动时无需 Cargo 或可写的临时目录。
 
 当前支持 egui/eframe 0.37。项目负责让共享 UI 可编译到 WASM，并适配截图、文件系统、全局快捷键等原生能力。
 

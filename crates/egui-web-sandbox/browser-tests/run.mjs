@@ -53,10 +53,15 @@ try {
   const embedded = process.env.SANDBOX_SERVER ?? join(target, 'debug/egui-embedded-web-app');
   const command = join(target, 'debug/egui-web-sandbox');
   const wasm = join(target, 'wasm32-unknown-unknown/debug/egui_web_app.wasm');
+  const failure = join(target, 'wasm32-unknown-unknown/debug/examples/startup_failure.wasm');
   const isolated = {cwd: empty, env: {...process.env, PATH: ''}};
-  const [url, cliUrl] = await Promise.all([
+  // A nonexistent temp directory catches any attempt to use the old on-disk generation path.
+  const noTemp = join(empty, 'no-temp-directory');
+  const cliOptions = {...isolated, env: {...isolated.env, TMPDIR: noTemp, TEMP: noTemp, TMP: noTemp}};
+  const [url, cliUrl, cliFailureUrl] = await Promise.all([
     startServer(embedded, ['0', '-b', 'localhost'], isolated),
-    startServer(command, [wasm, '--port=0', '--bind', '::1'], isolated),
+    startServer(command, [wasm, '--port=0', '--bind', '::1'], cliOptions),
+    startServer(command, [failure], cliOptions),
   ]);
   assert.equal(new URL(url).hostname, '127.0.0.1');
   assert.equal(new URL(cliUrl).hostname, '[::1]');
@@ -69,7 +74,13 @@ try {
   }
   fixtures.listen(0, '127.0.0.1');
   await once(fixtures, 'listening');
-  const env = {...process.env, SANDBOX_URL: `http://127.0.0.1:${fixtures.address().port}`, LAUNCHER_URL: url, CLI_URL: cliUrl};
+  const env = {
+    ...process.env,
+    SANDBOX_URL: `http://127.0.0.1:${fixtures.address().port}`,
+    LAUNCHER_URL: url,
+    CLI_URL: cliUrl,
+    CLI_FAILURE_URL: cliFailureUrl,
+  };
   for (const script of ['parallel.mjs', 'launcher.mjs']) {
     const child = spawn(process.execPath, [fileURLToPath(new URL(script, import.meta.url))], {env, stdio: 'inherit'});
     const [code] = await once(child, 'exit');

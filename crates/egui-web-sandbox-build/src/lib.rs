@@ -173,12 +173,38 @@ impl Builder {
 /// Generate browser bindings and serve a precompiled wasm-bindgen artifact.
 #[cfg(feature = "cli")]
 pub fn serve_wasm(wasm: &Path, address: std::net::SocketAddr) -> Result<()> {
-    let site = tempfile::tempdir()?;
-    let assets = generate(wasm, site.path())?
-        .into_iter()
-        .map(|(name, path)| Ok((name, fs::read(path)?)))
-        .collect::<std::io::Result<Vec<_>>>()?;
-    site.close()?;
+    let mut output = web_bindgen(wasm)?.generate_output()?;
+    let mut assets = vec![
+        ("app.js".into(), output.js().as_bytes().to_vec()),
+        ("app_bg.wasm".into(), output.wasm_mut().emit_wasm()),
+    ];
+    if let Some(start) = output.start() {
+        assets.push(("app_bg.js".into(), start.as_bytes().to_vec()));
+    }
+
+    // Match wasm-bindgen's output layout so its generated imports still resolve.
+    for (crate_id, snippets) in output.snippets() {
+        for (index, source) in snippets.iter().enumerate() {
+            assets.push((
+                format!("snippets/{crate_id}/inline{index}.js"),
+                source.as_bytes().to_vec(),
+            ));
+        }
+    }
+    for (path, source) in output.local_modules() {
+        assets.push((format!("snippets/{path}"), source.as_bytes().to_vec()));
+    }
+    if !output.npm_dependencies().is_empty() {
+        let dependencies: std::collections::BTreeMap<_, _> = output
+            .npm_dependencies()
+            .iter()
+            .map(|(name, (_, version))| (name, version))
+            .collect();
+        let manifest = serde_json::json!({ "dependencies": dependencies });
+        assets.push(("package.json".into(), serde_json::to_vec_pretty(&manifest)?));
+    }
+
+    drop(output);
     let server = egui_web_sandbox::server::Server::bind_assets_at(assets, address)?;
     println!("{}", server.url());
     server.run();
@@ -225,15 +251,20 @@ fn track_sources(wasm: &Path, manifest: &Path, workspace: &Path, output: &Path) 
     Ok(())
 }
 
-fn generate(wasm: &Path, site: &Path) -> Result<Vec<(String, PathBuf)>> {
-    fs::create_dir_all(site)?;
-    wasm_bindgen_cli_support::Bindgen::new()
+fn web_bindgen(wasm: &Path) -> Result<wasm_bindgen_cli_support::Bindgen> {
+    let mut bindgen = wasm_bindgen_cli_support::Bindgen::new();
+    bindgen
         .input_path(wasm)
         .web(true)?
         .omit_default_module_path(false)
         .typescript(false)
-        .out_name("app")
-        .generate(site)?;
+        .out_name("app");
+    Ok(bindgen)
+}
+
+fn generate(wasm: &Path, site: &Path) -> Result<Vec<(String, PathBuf)>> {
+    fs::create_dir_all(site)?;
+    web_bindgen(wasm)?.generate(site)?;
     let mut files = Vec::new();
     collect(site, site, &mut files)?;
     files.sort();
