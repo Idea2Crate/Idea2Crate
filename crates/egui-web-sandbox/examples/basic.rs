@@ -35,16 +35,16 @@ mod browser {
             .location()
             .search()?;
         let resettable = !web_sys::UrlSearchParams::new_with_str(&query)?.has("observe");
-        launch(move |cc| {
+        launch(Box::new(move |cc| {
             let sandbox = Sandbox::install(&cc.egui_ctx);
             if resettable {
                 sandbox.enable_reset();
             }
-            Demo {
+            Ok(Box::new(Demo {
                 app: Workbench::default(),
                 sandbox,
-            }
-        })
+            }))
+        }))
         .await
     }
 }

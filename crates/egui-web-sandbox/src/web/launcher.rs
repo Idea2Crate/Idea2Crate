@@ -1,10 +1,8 @@
 //! Own the renderer and observation bridge without wrapping the application's App.
 use super::{AgentBridge, available_document};
 use crate::Sandbox;
-use std::{cell::RefCell, error::Error, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{JsCast, prelude::*};
-
-type AppResult = Result<Box<dyn eframe::App>, Box<dyn Error + Send + Sync>>;
 
 /// A running browser app. Keep the returned JavaScript object alive until unmount.
 /// `destroy()` and the generated `free()` both release renderer and bridge resources.
@@ -38,17 +36,7 @@ impl Drop for WebApp {
 /// The factory receives the actual CreationContext. All App hooks remain owned by
 /// eframe; the launcher does not proxy or replace them. Native services and optional
 /// fixture reset handling remain the application's responsibility.
-pub async fn launch<A: eframe::App + 'static>(
-    create: impl FnOnce(&eframe::CreationContext<'_>) -> A + 'static,
-) -> Result<WebApp, JsValue> {
-    try_launch(move |cc| Ok(Box::new(create(cc)))).await
-}
-
-/// Start on the standard page with a factory returning a boxed App or an error.
-/// An existing eframe `AppCreator` can also be passed here.
-pub async fn try_launch(
-    app_creator: impl FnOnce(&eframe::CreationContext<'_>) -> AppResult + 'static,
-) -> Result<WebApp, JsValue> {
+pub async fn launch(app_creator: eframe::AppCreator<'static>) -> Result<WebApp, JsValue> {
     let canvas = available_document()?
         .get_element_by_id("canvas")
         .ok_or_else(|| JsValue::from_str("canvas #canvas unavailable"))?
@@ -61,7 +49,7 @@ pub async fn try_launch(
 pub async fn launch_on(
     canvas: web_sys::HtmlCanvasElement,
     options: eframe::WebOptions,
-    app_creator: impl FnOnce(&eframe::CreationContext<'_>) -> AppResult + 'static,
+    app_creator: eframe::AppCreator<'static>,
 ) -> Result<WebApp, JsValue> {
     available_document()?;
     let app = WebApp {

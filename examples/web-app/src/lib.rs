@@ -11,5 +11,5 @@ use {
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 pub async fn start() -> Result<WebApp, JsValue> {
-    launch(app::Notes::new).await
+    launch(Box::new(|cc| Ok(Box::new(app::Notes::new(cc))))).await
 }

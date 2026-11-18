@@ -6,7 +6,7 @@ type ClipboardHandler = Closure<dyn Fn(web_sys::ClipboardEvent)>;
 #[cfg(feature = "launcher")]
 mod launcher;
 #[cfg(feature = "launcher")]
-pub use launcher::{WebApp, launch, launch_on, try_launch};
+pub use launcher::{WebApp, launch, launch_on};
 
 fn available_document() -> Result<web_sys::Document, JsValue> {
     let window = web_sys::window().ok_or_else(|| JsValue::from_str("window unavailable"))?;
