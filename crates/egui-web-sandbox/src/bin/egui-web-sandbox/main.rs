@@ -8,7 +8,7 @@ use std::{env, error::Error};
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
 const USAGE: &str = "Usage: egui-web-sandbox <app.egsx> [PORT] [OPTIONS]";
-const PACK_USAGE: &str = "Usage: egui-web-sandbox pack <app.js> <app.egsx> [--app-version VERSION] [--wasm-bindgen-version VERSION]";
+const PACK_USAGE: &str = "Usage: egui-web-sandbox pack <app.js | --site BUILT_SITE> <app.egsx> [--app-version VERSION] [--wasm-bindgen-version VERSION]";
 
 fn main() {
     if let Err(error) = run() {
@@ -24,7 +24,9 @@ fn run() -> Result<()> {
             .peek()
             .is_some_and(|arg| arg == "--help" || arg == "-h")
         {
-            println!("{PACK_USAGE}\n\nPackage the output of wasm-bindgen --target web.");
+            println!(
+                "{PACK_USAGE}\n\nPackage wasm-bindgen --target web output or a built site with index.html."
+            );
             return Ok(());
         }
         return bundle::pack(PackOptions::parse(args)?);

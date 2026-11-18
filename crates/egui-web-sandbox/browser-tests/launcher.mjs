@@ -59,6 +59,45 @@ try {
 
   assert.deepEqual(errors, []);
 
+  await page.goto(new URL('desktop.html', process.env.SITE_URL ?? launcher).href);
+  const panel = page.getByRole('region', {name: 'App window'});
+  const open = page.getByRole('button', {name: 'Open app'});
+  assert.equal(await panel.count(), 0);
+  await open.click();
+  const frame = await (await page.locator('iframe').elementHandle()).contentFrame();
+  const desktopApp = new SandboxPage(page, {frame});
+  await desktopApp.ready();
+
+  async function drag(name, dx, dy) {
+    const box = await page.getByRole('button', {name}).boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy, {steps: 6});
+    await page.mouse.up();
+  }
+  const initial = await panel.boundingBox();
+  await drag('Resize app window', -100, -80);
+  const resized = await panel.boundingBox();
+  assert.equal(resized.width, initial.width - 100);
+  assert.equal(resized.height, initial.height - 80);
+  await drag('Move app window', 65, 50);
+  const moved = await panel.boundingBox();
+  assert.equal(moved.x, resized.x + 65);
+  assert.equal(moved.y, resized.y + 50);
+  await desktopApp.control('TextInput', 'Title').fill('In a desktop window');
+  await desktopApp.control('Button', 'Save').click();
+  await frame.waitForFunction(() => window.eguiSandbox.snapshot().controls.some(c => c.label === 'Saved: In a desktop window'));
+  await page.getByRole('button', {name: 'Close app window'}).click();
+  assert.equal(await page.locator('iframe').count(), 0);
+  assert.equal(await open.evaluate(element => element === document.activeElement), true);
+  await open.click();
+  const reopened = await (await page.locator('iframe').elementHandle()).contentFrame();
+  const reopenedApp = new SandboxPage(page, {frame: reopened});
+  await reopenedApp.ready();
+  assert.equal((await reopenedApp.control('TextInput', 'Title').read()).value, 'First note');
+  assert.deepEqual(errors, []);
+  console.log('PASS: desktop opens, resizes, moves and closes the unchanged Notes app');
+
   // The Rust constructor combines results from an inline and a nested file-based JS module.
   const modulePage = await context.newPage();
   await modulePage.goto(cliFailure);

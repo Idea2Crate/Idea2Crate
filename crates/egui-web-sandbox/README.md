@@ -44,6 +44,10 @@ processed WASM, generated JS modules and `version.json`. Inspect it with standar
 ZIP tools, for example `unzip -l target/my_app.egsx`. See the
 [complete example](../../examples/web-app/) for build commands.
 
+Open `/desktop.html` to run the same app in a movable, resizable desktop
+window. Existing Web applications can use `pack --site dist app.egsx`
+to keep their page and relative assets.
+
 The WASM library supplies the ordinary eframe App factory:
 
 ```rust,ignore

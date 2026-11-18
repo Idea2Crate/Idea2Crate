@@ -1,4 +1,4 @@
-use crate::Result;
+use crate::{Result, bundle::SITE_INDEX};
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_decode_str, utf8_percent_encode};
 use std::{
     borrow::Cow,
@@ -23,6 +23,14 @@ pub fn serve(
         (
             "index.html",
             include_bytes!("../../../browser/index.html").as_slice(),
+        ),
+        (
+            "desktop.html",
+            include_bytes!("../../../browser/desktop.html").as_slice(),
+        ),
+        (
+            "desktop.mjs",
+            include_bytes!("../../../browser/desktop.mjs").as_slice(),
         ),
         (
             "launch.mjs",
@@ -66,7 +74,7 @@ pub fn serve(
             let _ = request.respond(Response::empty(405));
             continue;
         }
-        let path = request.url().split('?').next().unwrap_or("/");
+        let (path, query) = request.url().split_once('?').unwrap_or((request.url(), ""));
         let Ok(path) = percent_decode_str(path).decode_utf8() else {
             let _ = request.respond(Response::empty(404));
             continue;
@@ -76,7 +84,20 @@ pub fn serve(
         } else {
             path.trim_start_matches('/')
         };
-        if name == "app.js" && module != name {
+        if module == SITE_INDEX && name == "index.html" {
+            let location = if query.is_empty() {
+                format!("/{SITE_INDEX}")
+            } else {
+                format!("/{SITE_INDEX}?{query}")
+            };
+            let response = match Header::from_bytes("Location", location) {
+                Ok(location) => Response::empty(302).with_header(location),
+                Err(()) => Response::empty(400),
+            };
+            let _ = request.respond(response);
+            continue;
+        }
+        if module != SITE_INDEX && name == "app.js" && module != name {
             let _ = request.respond(Response::empty(302).with_header(entry_location.clone()));
             continue;
         }
@@ -87,8 +108,20 @@ pub fn serve(
         let content_type = match name.rsplit('.').next() {
             Some("html") => "text/html; charset=utf-8",
             Some("js" | "mjs") => "text/javascript; charset=utf-8",
+            Some("css") => "text/css; charset=utf-8",
             Some("wasm") => "application/wasm",
             Some("json") => "application/json",
+            Some("webp") => "image/webp",
+            Some("png") => "image/png",
+            Some("svg") => "image/svg+xml",
+            Some("jpg" | "jpeg") => "image/jpeg",
+            Some("gif") => "image/gif",
+            Some("ico") => "image/x-icon",
+            Some("ttf") => "font/ttf",
+            Some("otf") => "font/otf",
+            Some("woff") => "font/woff",
+            Some("woff2") => "font/woff2",
+            Some("txt") => "text/plain; charset=utf-8",
             _ => "application/octet-stream",
         };
         let response = Response::new(

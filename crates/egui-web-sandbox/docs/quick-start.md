@@ -25,6 +25,10 @@ cargo build --locked -p egui-web-sandbox --features cli --bin egui-web-sandbox
 
 默认监听本机回环地址 `127.0.0.1`。Ctrl+C 结束服务。
 
+访问同一个地址下的 `/desktop.html`，点击 **Open app**，即可在虚拟桌面中打开已打包的应用。
+标题栏可拖动，右下角可缩放。两个手柄聚焦时都支持方向键。关闭窗口会卸载页面，重新打开会
+启动新的应用实例。应用仍由 eframe 管理生命周期。
+
 示例只有 Cargo 配置、普通 egui 界面和 WASM 入口，没有 `main.rs` 或 `build.rs`。
 见 [examples/web-app](../../../examples/web-app/)。
 
@@ -97,6 +101,18 @@ egui-web-sandbox target/my_app.egsx 8000 --bind ::1
 显式指定 `0.0.0.0` 或 `::` 会监听相应的所有网络接口。
 用 `egui-web-sandbox --help` 查看参数。
 
+已有 Web 页面时，可以直接打包项目的构建输出：
+
+```sh
+egui-web-sandbox pack --site dist target/my_app.egsx
+egui-web-sandbox target/my_app.egsx
+```
+
+`dist` 应是可静态部署的构建目录，包含 `index.html` 和页面需要的公开资源。
+文件保留相对目录，并在 `/site/` 下运行。页面引用资源时使用相对路径。
+打包收录 HTML、CSS、JS、WASM、JSON、字体、常用图片和文本，跳过隐藏文件和符号链接。
+桌面窗口复用原页面及其资源初始化。
+
 ## 3. 接入现有项目时的配置
 
 - 普通 App 和业务逻辑放在可共享的模块或 library，入口只替换构造函数。
@@ -133,6 +149,9 @@ await app.ready();
 await app.control('TextInput', 'Title').fill('Next idea');
 await app.control('Button', 'Save').click();
 ```
+
+桌面模式下，使用 `new SandboxPage(page, {frame})`，其中 `frame` 是应用 iframe 对应的
+Playwright Frame。客户端仍通过顶层页面发送鼠标和键盘输入。
 
 每个 Agent 使用独立 BrowserContext 和页面。同名控件使用
 `{window: 'Project brief'}` 限定范围。输入通过浏览器鼠标和键盘发送，

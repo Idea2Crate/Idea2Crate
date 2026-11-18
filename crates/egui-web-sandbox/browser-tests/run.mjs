@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import {spawn} from 'node:child_process';
+import {execFileSync, spawn} from 'node:child_process';
 import {once} from 'node:events';
-import {copyFile, mkdtemp, rm} from 'node:fs/promises';
+import {copyFile, mkdir, mkdtemp, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -39,13 +39,26 @@ try {
     await copyFile(join(web, name), bundle);
     return bundle;
   }));
+  const site = join(empty, 'built-site');
+  await mkdir(site);
+  const browserAsset = name => fileURLToPath(new URL(`../browser/${name}`, import.meta.url));
+  await Promise.all([
+    copyFile(browserAsset('index.html'), join(site, 'index.html')),
+    copyFile(browserAsset('launch.mjs'), join(site, 'launch.mjs')),
+    copyFile(join(web, 'notes/egui_web_app.js'), join(site, 'app.js')),
+    copyFile(join(web, 'notes/egui_web_app_bg.wasm'), join(site, 'egui_web_app_bg.wasm')),
+  ]);
+  const siteBundle = join(empty, 'site.egsx');
+  execFileSync(command, ['pack', '--site', site, siteBundle]);
+  await rm(site, {recursive: true});
   // Only the bundles are copied. Runtime has no build tools or writable temp directory.
   const noTemp = join(empty, 'no-temp-directory');
   const options = {cwd: empty, env: {...process.env, PATH: '', TMPDIR: noTemp, TEMP: noTemp, TMP: noTemp}};
-  const [workbenchUrl, notesUrl, failureUrl] = await Promise.all([
+  const [workbenchUrl, notesUrl, failureUrl, siteUrl] = await Promise.all([
     startServer(command, [bundles[0], '0', '-b', 'localhost'], options),
     startServer(command, [bundles[1], '--port=0', '--bind', '::1'], options),
     startServer(command, [bundles[2]], options),
+    startServer(command, [siteBundle], options),
   ]);
   assert.equal(new URL(workbenchUrl).hostname, '127.0.0.1');
   assert.equal(new URL(notesUrl).hostname, '[::1]');
@@ -65,6 +78,7 @@ try {
     SANDBOX_URL: workbenchUrl,
     LAUNCHER_URL: notesUrl,
     CLI_FAILURE_URL: failureUrl,
+    SITE_URL: siteUrl,
   };
   for (const script of ['parallel.mjs', 'launcher.mjs']) {
     const child = spawn(process.execPath, [fileURLToPath(new URL(script, import.meta.url))], {env, stdio: 'inherit'});

@@ -81,23 +81,27 @@ impl Options {
 }
 
 pub struct PackOptions {
-    pub entry: PathBuf,
+    pub source: PathBuf,
+    pub site: bool,
     pub output: PathBuf,
     pub app_version: Option<String>,
     pub wasm_bindgen_version: Option<String>,
 }
 
 impl PackOptions {
-    pub fn parse(mut args: impl Iterator<Item = OsString>) -> Result<Self> {
-        let entry = PathBuf::from(args.next().ok_or(PACK_USAGE)?);
+    pub fn parse(args: impl Iterator<Item = OsString>) -> Result<Self> {
+        let mut args = args.peekable();
+        let site = args.next_if_eq("--site").is_some();
+        let source = PathBuf::from(args.next().ok_or(PACK_USAGE)?);
         let output = PathBuf::from(args.next().ok_or(PACK_USAGE)?);
-        if entry.extension() != Some(OsStr::new("js"))
+        if (!site && source.extension() != Some(OsStr::new("js")))
             || output.extension() != Some(OsStr::new(BUNDLE_EXTENSION))
         {
             return Err(PACK_USAGE.into());
         }
         let mut options = Self {
-            entry,
+            source,
+            site,
             output,
             app_version: None,
             wasm_bindgen_version: None,
