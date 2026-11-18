@@ -9,7 +9,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -17,10 +17,49 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin/wasm-bindgen*
+            target
+          key: rust-web-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Install pinned Rust toolchain
+        run: rustup show
       - name: Local pre-commit checks
         run: |
           python3 -m pip install pre-commit==4.7.0
           pre-commit run --all-files
+      - name: Build sandbox CLI and web fixtures
+        run: |
+          wasm_bindgen_version=$(python3 -c 'import tomllib; print(next(p["version"] for p in tomllib.load(open("Cargo.lock", "rb"))["package"] if p["name"] == "wasm-bindgen"))')
+          if [[ "$(wasm-bindgen --version 2>/dev/null || true)" != "wasm-bindgen $wasm_bindgen_version" ]]; then
+            cargo install --locked --force --bin wasm-bindgen wasm-bindgen-cli --version "=$wasm_bindgen_version"
+          fi
+          cargo check --locked --workspace --lib --all-features
+          cargo build --locked -p egui-web-sandbox --features cli --bin egui-web-sandbox
+          cargo build --locked -p egui-web-app --lib --target wasm32-unknown-unknown
+          cargo build --locked -p egui-web-sandbox --examples --features launcher --target wasm32-unknown-unknown
+          wasm_bindgen_input=target/wasm32-unknown-unknown/debug
+          wasm-bindgen --target web --no-typescript --out-dir target/web/notes "$wasm_bindgen_input/egui_web_app.wasm"
+          wasm-bindgen --target web --no-typescript --out-dir target/web/workbench "$wasm_bindgen_input/examples/basic.wasm"
+          wasm-bindgen --target web --no-typescript --out-dir target/web/failure "$wasm_bindgen_input/examples/startup_failure.wasm"
+          target/debug/egui-web-sandbox pack target/web/notes/egui_web_app.js target/web/notes.egsx --wasm-bindgen-version "$wasm_bindgen_version"
+          target/debug/egui-web-sandbox pack target/web/workbench/basic.js target/web/workbench.egsx --wasm-bindgen-version "$wasm_bindgen_version"
+          target/debug/egui-web-sandbox pack target/web/failure/startup_failure.js target/web/failure.egsx --wasm-bindgen-version "$wasm_bindgen_version"
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Check isolated browser instances
+        shell: bash
+        run: |
+          npm ci --ignore-scripts --prefix crates/egui-web-sandbox/browser-tests
+          cd crates/egui-web-sandbox/browser-tests
+          npx playwright install --with-deps chromium --only-shell
+          cd "$GITHUB_WORKSPACE"
+          npm test --prefix crates/egui-web-sandbox/browser-tests
       - name: Validate workflows
         run: |
           curl --fail --location --output /tmp/actionlint.tar.gz https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz

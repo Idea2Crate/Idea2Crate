@@ -1,0 +1,22 @@
+[package]
+name = "egui-web-app"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+egui-web-sandbox = { version = "0.1.0", path = "../../crates/egui-web-sandbox", features = ["launcher"] }
+eframe = { version = "0.37.0", default-features = false, features = ["glow", "default_fonts"] }
+
+[target.'cfg(target_os = "linux")'.dependencies.eframe]
+version = "0.37.0"
+default-features = false
+features = ["x11"]
+
+[lints.rust]
+unsafe_code = "forbid"
